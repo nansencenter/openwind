@@ -6,11 +6,12 @@
 #               http://www.gnu.org/licenses/gpl-3.0.html
 from nansat import Nansat
 import numpy as np
+import scipy
+import os
 
 from model_wind import ModelWind
 from cmod5n import cmod5n_inverse
 
-import scipy
 
 import matplotlib 
 matplotlib.use('Agg')
