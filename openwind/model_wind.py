@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	15.08.2013
-# Last modified:16.08.2013 11:05
+# Last modified:19.08.2013 14:31
 # Copyright:    (c) NERSC
 # License:      GNU GPL
 #-------------------------------------------------------------------------------
@@ -99,10 +99,6 @@ class ModelWind(Nansat, object):
                     self.sar.get_time()[0].strftime('%Y%m%d') + '_' + hour + '.grib' )
 
         return hfile
-        #shutil.copy(hfile,'.')
-        #return os.path.basename(hfile)
-        # Read wind and add band with model wind field
-        #self.model_wind = Nansat(self.windGribFile)
 
     def get_ncep_wind(self):
         # NCEP wind file 
@@ -126,8 +122,3 @@ class ModelWind(Nansat, object):
                 'gfs.t%.2dz.master.grbf%.2d' %(basehour, forecasthour) )
 
         return nfile
-        #shutil.copy(nfile,'.')
-        #self.windGribFile = os.path.basename(nfile)
-        ## Read wind and add band with model wind field
-        #self.model_wind = Nansat(self.windGribFile)
-

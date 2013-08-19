@@ -10,6 +10,8 @@ import numpy as np
 from model_wind import ModelWind
 from cmod5n import cmod5n_inverse
 
+import scipy
+
 import matplotlib 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -24,10 +26,6 @@ class SARWind(Nansat, object):
     '''
     A class for retrieving wind speed from SAR images using cmod
     '''
-    resize_factor = 0.5
-    #resampleAlg = 1 # bilinear (preferred but there is a problem in nansat
-                     # with missing projection and metadata
-    resampleAlg = 0 # nearest neighbour
 
     def __init__(self, *args, **kwargs):
         super(SARWind, self).__init__(*args,**kwargs)
@@ -61,45 +59,50 @@ class SARWind(Nansat, object):
                     })
 
         names = [self.bands()[k]['name'] for k in self.bands().keys()] 
+        # Add pixelfunctions for retrieving wind speed and direction
         metaDict = [
                     {
                         'src': [{
                                 'SourceFilename': self.raw.fileName,
-                                'SourceBand': np.where(np.array(names)=='U')[0][0]
+                                'SourceBand': 
+                                    int(np.where(np.array(names)=='U')[0][0])
                             },{
                                 'SourceFilename': self.raw.fileName,
-                                'SourceBand': np.where(np.array(names)=='V')[0][0]
+                                'SourceBand':
+                                    int(np.where(np.array(names)=='V')[0][0])
                                 }],
                         'dst': {
                                 'wkv': 'wind_from_direction',
+                                'name': 'winddirection',
                                 'PixelFunctionType': 'UVToDirectionFrom',
+                            }
+                    },{
+                        'src': [{
+                                'SourceFilename': self.raw.fileName,
+                                'SourceBand': 
+                                    int(np.where(np.array(names)=='U')[0][0])
+                            },{
+                                'SourceFilename': self.raw.fileName,
+                                'SourceBand':
+                                    int(np.where(np.array(names)=='V')[0][0])
+                                }],
+                        'dst': {
+                            'wkv': 'wind_speed',
+                            'name': 'windspeed',
+                            'PixelFunctionType': 'UVToMagnitude',
                             }
                     },
                 ]
-
-        ## Add pixel functions in self.vrt, then copy this to self.raw
-        #metaDict = [{'src': {'SourceFilename': fileName, 'SourceBand': 1},
-        #             'dst': {'short_name': 'RawCounts'}}]
-        #        metaDict.append({'src': srcFiles,
-        #                         'dst': {'short_name': short_names[iPixFunc],
-        #                                 'wkv': wkt[iPixFunc],
-        #                                 'PixelFunctionType': pixelFunctionTypes[iPixFunc],
-        #                                 'polarization': polarization,
-        #                                 'suffix': polarization,
-        #                                 'pass': sphPass[iPixFunc],
-        #                                 'dataType': 6}})
-
-        ## add bands with metadata and corresponding values to the empty VRT
         self.raw._create_bands(metaDict)
-        # copy raw VRT object to the current vrt
-        self.vrt = self.raw.copy()
-
         # Add metadata:
         #               - Model wind field
         #               - CMOD-function
         #               - etc
+        self.raw.dataset.SetMetadataItem('Model wind field',
+                model_wind.mapper[7:])
 
-
+        # copy raw VRT object to the current vrt
+        self.vrt = self.raw.copy()
 
     def invalid2nan(self, bandName):
         nparr = self.get_GDALRasterBand(bandName).ReadAsArray()
@@ -142,10 +145,12 @@ class SARWind(Nansat, object):
         return inci
 
     def plot_example(self):
+        resize_factor = 0.2
+        resampleAlg = 0 # nearest neighbour
         look_direction = float(self.get_metadata('SAR_center_look_direction'))
-        self.resize(self.resize_factor, eResampleAlg=self.resampleAlg)
+        self.resize(resize_factor, eResampleAlg=resampleAlg)
         speed = self.invalid2nan('windspeed')
-        dirGeo = self.get_GDALRasterBand('winddir').ReadAsArray()
+        dirGeo = self.get_GDALRasterBand('winddirection').ReadAsArray()
         dirLookRelative = np.mod(np.subtract( dirGeo, look_direction ), 360)
         dirRange = -np.sin(dirLookRelative*np.pi/180.)
         dirAzim = np.cos(dirLookRelative*np.pi/180.)
@@ -196,8 +201,8 @@ class SARWind(Nansat, object):
         dd = int(np.round(np.shape(speed)[1]/10))
         # Meteorological barbs
         Q = map.barbs(x[dd-1::dd,::dd], y[dd-1::dd,::dd],
-                self.get_GDALRasterBand('east_wind').ReadAsArray()[dd-1::dd,::dd],
-                self.get_GDALRasterBand('north_wind').ReadAsArray()[dd-1::dd,::dd])
+                self.get_GDALRasterBand('U').ReadAsArray()[dd-1::dd,::dd],
+                self.get_GDALRasterBand('V').ReadAsArray()[dd-1::dd,::dd])
         #Quiver
         #Q = map.quiver(x[::dd,dd-1::dd], y[::dd,dd-1::dd],
         #        self.get_GDALRasterBand('east_wind').ReadAsArray()[::dd,dd-1::dd],
@@ -229,7 +234,7 @@ class SARWind(Nansat, object):
         #elif wtype=='cmod':
         #    t=plt.title('CMOD wind field',fontsize=titleSize)
         #t.set_position((0.5,1.02))
-        fig.savefig( os.path.join(dir,fn), facecolor='w', edgecolor='w', dpi=300,
+        fig.savefig( 'windfield'+os.path.basename(self.fileName)+'.png', facecolor='w', edgecolor='w', dpi=300,
                 bbox_inches="tight", pad_inches=0.1)
 
         self.resize()
