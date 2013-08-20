@@ -49,6 +49,15 @@ class SARWind(Nansat, object):
         winddir_relative = np.mod(winddir - look_direction, 360)
         windspeed = self.get_cmod_wind(winddir_relative)
 
+        self.add_band(array=windspeed, parameters={
+                        'wkv': 'wind_speed',
+                        'name': 'windspeed',
+                    })
+        self.add_band(array=winddir, parameters={
+                        'wkv': 'wind_from_direction',
+                        'name': 'winddirection',
+                    })
+
         u = windspeed*np.sin((winddir+180)/np.pi)
         v = windspeed*np.cos((winddir+180)/np.pi)
 
@@ -59,42 +68,6 @@ class SARWind(Nansat, object):
                         'wkv': 'northward_wind',
                     })
 
-        names = [self.bands()[k]['name'] for k in self.bands().keys()] 
-        # Add pixelfunctions for retrieving wind speed and direction
-        metaDict = [
-                    {
-                        'src': [{
-                                'SourceFilename': self.raw.fileName,
-                                'SourceBand': 
-                                    int(np.where(np.array(names)=='U')[0][0])
-                            },{
-                                'SourceFilename': self.raw.fileName,
-                                'SourceBand':
-                                    int(np.where(np.array(names)=='V')[0][0])
-                                }],
-                        'dst': {
-                                'wkv': 'wind_from_direction',
-                                'name': 'winddirection',
-                                'PixelFunctionType': 'UVToDirectionFrom',
-                            }
-                    },{
-                        'src': [{
-                                'SourceFilename': self.raw.fileName,
-                                'SourceBand': 
-                                    int(np.where(np.array(names)=='U')[0][0])
-                            },{
-                                'SourceFilename': self.raw.fileName,
-                                'SourceBand':
-                                    int(np.where(np.array(names)=='V')[0][0])
-                                }],
-                        'dst': {
-                            'wkv': 'wind_speed',
-                            'name': 'windspeed',
-                            'PixelFunctionType': 'UVToMagnitude',
-                            }
-                    },
-                ]
-        self.raw._create_bands(metaDict)
         # Add metadata:
         #               - Model wind field
         #               - CMOD-function
