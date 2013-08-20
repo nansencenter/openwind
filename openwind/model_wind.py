@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	15.08.2013
-# Last modified:19.08.2013 14:31
+# Last modified:20.08.2013 11:09
 # Copyright:    (c) NERSC
 # License:      GNU GPL
 #-------------------------------------------------------------------------------
@@ -36,7 +36,10 @@ class ModelWind(Nansat, object):
             should probably be replaced by a simpler nansat.Domain object and
             a time.
         '''
-        self.sar = sar
+        if isinstance(sar,basestring):
+            self.sar = Nansat(sar)
+        else:
+            self.sar = sar
         gribfile = self.get_hirlam_wind()
         success = True
         if os.path.exists(gribfile):
@@ -59,7 +62,7 @@ class ModelWind(Nansat, object):
             else:
                 raise IOError('Cannot locate model wind field information')
         # Reproject model wind field to SAR image coverage
-        self.reproject(sar)
+        self.reproject(self.sar)
 
     def __del__(self):
         if hasattr(self, 'windGribFile') and os.path.exists(self.windGribFile):
