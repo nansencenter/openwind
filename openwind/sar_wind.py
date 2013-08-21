@@ -58,8 +58,11 @@ class SARWind(Nansat, object):
                         'name': 'winddirection',
                     })
 
-        u = windspeed*np.sin((winddir+180)/np.pi)
-        v = -windspeed*np.cos((winddir+180)/np.pi)
+        # Winddir is defined as the direction from which the wind is blowing
+        # positive clockwise from north. Switch angles and coordinate system
+        # (v=x, u=-y) to get it mathematically correct:
+        u = -windspeed*np.sin((180.0 - winddir)*np.pi/180.0)
+        v = windspeed*np.cos((180.0 - winddir)*np.pi/180.0)
 
         self.add_band(array=u, parameters={
                         'wkv': 'eastward_wind',
