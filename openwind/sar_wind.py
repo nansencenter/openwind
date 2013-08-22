@@ -106,10 +106,10 @@ class SARWind(Nansat, object):
         if not np.isrealobj(inci[0][0]):
             # try to open non-complex band
             if self.has_band('incidence_angle_noncomplex'):
-                inci = self.nObj.get_GDALRasterBand('incidence_angle_noncomplex').ReadAsArray(**kwargs)
+                inci = self.get_GDALRasterBand('incidence_angle_noncomplex').ReadAsArray(**kwargs)
             else:
-                inci = np.abs(self.nObj.get_GDALRasterBand('incidence_angle').ReadAsArray(**kwargs))
-                self.nObj.add_band(array=inci, parameters={
+                inci = np.abs(self.get_GDALRasterBand('incidence_angle').ReadAsArray(**kwargs))
+                self.add_band(array=inci, parameters={
                         'name': 'incidence_angle_noncomplex',
                         'long_name': 'Non-complex incidence angle for correct netcdf export',
                         'wkv': 'angle_of_incidence',
