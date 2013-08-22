@@ -35,7 +35,7 @@ class SARWind(Nansat, object):
         # that it has VV pol nrcs
         names = [self.bands()[k]['name'] for k in self.bands().keys()] 
         if not 'sigma0_VV' in names:
-            raise TypeError(self.filename + ' is not a valid NanSat SAR image file')
+            raise TypeError(self.fileName + ' is not a valid NanSat SAR image file')
 
         # Get model wind field
         model_wind = ModelWind(self)
