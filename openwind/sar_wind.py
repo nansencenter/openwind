@@ -121,7 +121,8 @@ class SARWind(Nansat, object):
         inci[ind] = np.nan
         return inci
 
-    def plot_example(self, model_wind=None):
+    def plot_example(self, model_wind=None, filename='windfield.png', dir='.'):
+
         resize_factor = 0.2
         resampleAlg = 0 # nearest neighbour
         self.resize(resize_factor, eResampleAlg=resampleAlg)
@@ -216,7 +217,7 @@ class SARWind(Nansat, object):
         #elif wtype=='cmod':
         #    t=plt.title('CMOD wind field',fontsize=titleSize)
         #t.set_position((0.5,1.02))
-        fig.savefig( 'windfield'+os.path.basename(self.fileName)+'.png', facecolor='w', edgecolor='w', dpi=300,
+        fig.savefig( os.path.join(dir,filename), facecolor='w', edgecolor='w', dpi=300,
                 bbox_inches="tight", pad_inches=0.1)
 
         self.resize()
