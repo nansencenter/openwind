@@ -36,6 +36,9 @@ class SARWind(Nansat, object):
         names = [self.bands()[k]['name'] for k in self.bands().keys()] 
         if not 'sigma0_VV' in names:
             raise TypeError(self.fileName + ' is not a valid NanSat SAR image file')
+        
+        if os.path.splitext(self.fileName)[1]=='.nc':
+            return
 
         # Get model wind field
         model_wind = ModelWind(self)
@@ -130,8 +133,8 @@ class SARWind(Nansat, object):
         vv = self.get_GDALRasterBand('V').ReadAsArray()
         if model_wind:
             model_wind.resize(resize_factor, eResampleAlg=resampleAlg)
-            uu = model_wind.get_GDALRasterBand('east_wind').ReadAsArray()
-            vv = model_wind.get_GDALRasterBand('north_wind').ReadAsArray()
+            uu = model_wind.get_GDALRasterBand('U').ReadAsArray()
+            vv = model_wind.get_GDALRasterBand('V').ReadAsArray()
         look_direction = float(self.get_metadata('SAR_center_look_direction'))
         speed = self.invalid2nan('windspeed')
         dirGeo = self.get_GDALRasterBand('winddirection').ReadAsArray()
@@ -188,8 +191,8 @@ class SARWind(Nansat, object):
                 vv[dd::dd-1,::dd])
         #Quiver
         #Q = map.quiver(x[::dd,dd-1::dd], y[::dd,dd-1::dd],
-        #        self.get_GDALRasterBand('east_wind').ReadAsArray()[::dd,dd-1::dd],
-        #        self.get_GDALRasterBand('north_wind').ReadAsArray()[::dd,dd-1::dd],
+        #        self.get_GDALRasterBand('U').ReadAsArray()[::dd,dd-1::dd],
+        #        self.get_GDALRasterBand('V').ReadAsArray()[::dd,dd-1::dd],
         #        width=0.001)
         map.fillcontinents(color='#cc9966',lake_color='#99ffff')
 
