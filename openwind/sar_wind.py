@@ -84,19 +84,8 @@ class SARWind(Nansat, object):
         # copy raw VRT object to the current vrt
         self.vrt = self.raw.copy()
 
-    def invalid2nan(self, bandName):
-        nparr = self.get_GDALRasterBand(bandName).ReadAsArray()
-        if not np.isrealobj(nparr[0][0]):
-            nparr = np.abs(nparr)
-        if self.get_metadata(bandID=bandName).has_key('_FillValue'):
-            fillValue = float(self.get_metadata(bandID=bandName)['_FillValue'])
-            # Set invalid and missing data to np.NaN
-            # This is relevant for nansat data retrieved from netcdf
-            nparr[np.where(nparr==fillValue)]=np.nan
-        return nparr
-
     def get_cmod_wind(self, winddir_relative):
-        s0 = self.invalid2nan('sigma0_VV')
+        s0 = self['sigma0_VV']
         # consider changing cmod to use only one line of incidence angles
         windspeedcmod5 = cmod5n_inverse( s0, winddir_relative,
                 self.incidence_angle() )
@@ -136,7 +125,7 @@ class SARWind(Nansat, object):
             uu = model_wind.get_GDALRasterBand('U').ReadAsArray()
             vv = model_wind.get_GDALRasterBand('V').ReadAsArray()
         look_direction = float(self.get_metadata('SAR_center_look_direction'))
-        speed = self.invalid2nan('windspeed')
+        speed = self['windspeed']
         dirGeo = self.get_GDALRasterBand('winddirection').ReadAsArray()
         dirLookRelative = np.mod(np.subtract( dirGeo, look_direction ), 360)
         dirRange = -np.sin(dirLookRelative*np.pi/180.)
