@@ -40,9 +40,14 @@ class SARWind(Nansat, object):
         if os.path.splitext(self.fileName)[1]=='.nc':
             return
 
+        # Reduce size of image to 500 m pixels in range
+        line_spacing = float(self.get_metadata()['LINE_SPACING'])
+        self.resize(line_spacing/500.)
+        self.raw = self.vrt.copy()
+
         # Get model wind field
         model_wind = ModelWind(self)
-        winddir = model_wind.get_GDALRasterBand('winddirection').ReadAsArray()
+        winddir = model_wind['winddirection']
 
         # NOTE 1: The look direction is defined in the center of the
         # domain clockwise from north. For longer domains, especially at high
@@ -99,6 +104,11 @@ class SARWind(Nansat, object):
             # try to open non-complex band
             if self.has_band('incidence_angle_noncomplex'):
                 inci = self.get_GDALRasterBand('incidence_angle_noncomplex').ReadAsArray(**kwargs)
+                # Set invalid and missing data to np.nan
+                if inci.GetMetadata().has_key('_FillValue'):
+                    fillValue = float(inci.GetMetadata()['_FillValue'])
+                    inci[np.where(inci==fillValue)]=np.nan
+                inci[np.where(np.isinf(inci))] = np.nan
             else:
                 inci = np.abs(self.get_GDALRasterBand('incidence_angle').ReadAsArray(**kwargs))
                 self.add_band(array=inci, parameters={
@@ -115,18 +125,14 @@ class SARWind(Nansat, object):
 
     def plot_example(self, model_wind=None, filename='windfield.png', dir='.'):
 
-        resize_factor = 0.2
-        resampleAlg = 0 # nearest neighbour
-        self.resize(resize_factor, eResampleAlg=resampleAlg)
-        uu = self.get_GDALRasterBand('U').ReadAsArray()
-        vv = self.get_GDALRasterBand('V').ReadAsArray()
+        uu = self['U']
+        vv = self['V']
         if model_wind:
-            model_wind.resize(resize_factor, eResampleAlg=resampleAlg)
-            uu = model_wind.get_GDALRasterBand('U').ReadAsArray()
-            vv = model_wind.get_GDALRasterBand('V').ReadAsArray()
+            uu = model_wind['U']
+            vv = model_wind['V']
         look_direction = float(self.get_metadata('SAR_center_look_direction'))
         speed = self['windspeed']
-        dirGeo = self.get_GDALRasterBand('winddirection').ReadAsArray()
+        dirGeo = self['winddirection']
         dirLookRelative = np.mod(np.subtract( dirGeo, look_direction ), 360)
         dirRange = -np.sin(dirLookRelative*np.pi/180.)
         dirAzim = np.cos(dirLookRelative*np.pi/180.)
@@ -178,11 +184,6 @@ class SARWind(Nansat, object):
         # Meteorological barbs
         Q = map.barbs(x[dd::dd-1,::dd], y[dd::dd-1,::dd], uu[dd::dd-1,::dd],
                 vv[dd::dd-1,::dd])
-        #Quiver
-        #Q = map.quiver(x[::dd,dd-1::dd], y[::dd,dd-1::dd],
-        #        self.get_GDALRasterBand('U').ReadAsArray()[::dd,dd-1::dd],
-        #        self.get_GDALRasterBand('V').ReadAsArray()[::dd,dd-1::dd],
-        #        width=0.001)
         map.fillcontinents(color='#cc9966',lake_color='#99ffff')
 
         nLines = 3.
@@ -211,9 +212,3 @@ class SARWind(Nansat, object):
         #t.set_position((0.5,1.02))
         fig.savefig( os.path.join(dir,filename), facecolor='w', edgecolor='w', dpi=300,
                 bbox_inches="tight", pad_inches=0.1)
-
-        self.resize()
-        if model_wind:
-            model_wind.resize()
-
-
