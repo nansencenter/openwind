@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	15.08.2013
-# Last modified:20.08.2013 11:09
+# Last modified:08.09.2013 13:24
 # Copyright:    (c) NERSC
 # License:      GNU GPL
 #-------------------------------------------------------------------------------
@@ -15,12 +15,15 @@ from nansat import Nansat
 import os
 import numpy as np
 
+import pdb
+
 # Locations of the grib-files are hardcoded to my local directory for now.
 # Later, the model wind field should be retrieved from an online service...
 
 # REMEMBER TO MODIFY THESE LISTS TO SUIT YOUR LOCAL SYSTEM:
 HIRLAM_wind_dir = [ # Add the location of your hirlam dir
                     '/Volumes/sat/auxdata/model/met.no/',
+                    '/Users/mortenh/met.no/',
                 ]
 NCEP_wind_dir = [   # Add the location of your ncep dir
                     '/Volumes/sat/auxdata/model/ncep/',
