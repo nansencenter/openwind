@@ -29,6 +29,10 @@ class SARWind(Nansat, object):
     '''
 
     def __init__(self, *args, **kwargs):
+        if kwargs.has_key('winddir'):
+            winddir = kwargs.pop('winddir')
+        else:
+            winddir = np.nan
         super(SARWind, self).__init__(*args,**kwargs)
 
         # Check that this is a SAR acquisition that has a NanSat mapper and
@@ -45,9 +49,15 @@ class SARWind(Nansat, object):
         self.resize(line_spacing/500.)
         self.raw = self.vrt.copy()
 
-        # Get model wind field
-        model_wind = ModelWind(self)
-        winddir = model_wind['winddirection']
+        if np.isnan(winddir):
+            # Get model wind field
+            model_wind = ModelWind(self)
+            winddir = model_wind['winddirection']
+            # Add metadata:
+            self.raw.dataset.SetMetadataItem('Model wind field',
+                    model_wind.mapper[7:])
+        else:
+            winddir = np.ones(np.shape(self[1]))*winddir
 
         # NOTE 1: The look direction is defined in the center of the
         # domain clockwise from north. For longer domains, especially at high
@@ -79,21 +89,14 @@ class SARWind(Nansat, object):
                         'wkv': 'northward_wind',
                     })
 
-        # Add metadata:
-        #               - Model wind field
-        #               - CMOD-function
-        #               - etc
-        self.raw.dataset.SetMetadataItem('Model wind field',
-                model_wind.mapper[7:])
-
         # copy raw VRT object to the current vrt
         self.vrt = self.raw.copy()
 
     def get_cmod_wind(self, winddir_relative):
-        s0 = self['sigma0_VV']
+        s0 = np.abs(self['sigma0_VV'])
         # consider changing cmod to use only one line of incidence angles
         windspeedcmod5 = cmod5n_inverse( s0, winddir_relative,
-                self.incidence_angle() )
+                np.abs(self.incidence_angle()) )
         windspeedcmod5[np.where(np.isnan(s0))] = np.nan
         windspeedcmod5[np.where(np.isinf(s0))] = np.nan
         return windspeedcmod5
