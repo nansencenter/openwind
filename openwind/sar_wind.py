@@ -28,6 +28,8 @@ class SARWind(Nansat, object):
     A class for retrieving wind speed from SAR images using cmod
     '''
 
+    pixel_size = 500. # meter
+
     def __init__(self, *args, **kwargs):
         if kwargs.has_key('winddir'):
             winddir = kwargs.pop('winddir')
@@ -39,14 +41,19 @@ class SARWind(Nansat, object):
         # that it has VV pol nrcs
         names = [self.bands()[k]['name'] for k in self.bands().keys()] 
         if not 'sigma0_VV' in names:
-            raise TypeError(self.fileName + ' is not a valid NanSat SAR image file')
+            raise TypeError(self.fileName + 
+                    ' does not have SAR NRCS in VV polarization')
         
         if os.path.splitext(self.fileName)[1]=='.nc':
             return
 
-        # Reduce size of image to 500 m pixels in range
+        # Reduce size of image 
         line_spacing = float(self.get_metadata()['LINE_SPACING'])
-        self.resize(line_spacing/500.)
+        self.resize(line_spacing/self.pixel_size, eResampleAlg=0) 
+        # save raw vrt to tmp for later retrieval
+        tmp = self.raw
+        # copy reduced vrt to raw to get correct (reduced) size of the
+        # model_wind object created below
         self.raw = self.vrt.copy()
 
         if np.isnan(winddir):
@@ -58,6 +65,22 @@ class SARWind(Nansat, object):
                     model_wind.mapper[7:])
         else:
             winddir = np.ones(np.shape(self[1]))*winddir
+    
+        self.raw = tmp
+        # resize self to original size
+        self.resize()
+
+        if 'PixelFunctionType' in self.get_metadata(bandID='sigma0_VV').keys():
+            # copy sigma0_VV to numpy array and add this as a separate band to
+            # avoid problem with resizing pixelfunction bands.
+            # This is a temporary workaround until the nansat resize issue
+            # nansencenter/nansat#41 is fixed
+            s0 = self['sigma0_VV']
+            self.add_band(array=s0, parameters={
+                'wkv': 'surface_backwards_scattering_coefficient_of_radar_wave',
+                'name': 's0tmp',
+            })
+            self.vrt = self.raw.copy()
 
         # NOTE 1: The look direction is defined in the center of the
         # domain clockwise from north. For longer domains, especially at high
@@ -65,8 +88,23 @@ class SARWind(Nansat, object):
         # using the center angle will be a coarse approximation.
         look_direction = float(self.vrt.dataset.GetMetadataItem('SAR_center_look_direction'))
         winddir_relative = np.mod(winddir - look_direction, 360)
-        windspeed = self.get_cmod_wind(winddir_relative)
+        windspeed, s0, inci = self.get_cmod_wind(winddir_relative)
 
+        # Reduce size of self 
+        self.resize(line_spacing/self.pixel_size) 
+        # completely and forever...
+        self.raw = self.vrt.copy()
+
+        # Add source numpy arrays used in cmod as bands
+        self.add_band(array=s0, parameters={
+                        'wkv': 'surface_backwards_scattering_coefficient_of_radar_wave',
+                        'name': 's0_src4wind',
+                    })
+        self.add_band(array=inci, parameters={
+                        'wkv': 'angle_of_incidence',
+                        'name': 'inci_src4wind',
+                    })
+        # Add wind speed and direction as bands
         self.add_band(array=windspeed, parameters={
                         'wkv': 'wind_speed',
                         'name': 'windspeed',
@@ -93,38 +131,26 @@ class SARWind(Nansat, object):
         self.vrt = self.raw.copy()
 
     def get_cmod_wind(self, winddir_relative):
-        s0 = np.abs(self['sigma0_VV'])
+        # Resize self using Lanczos resampling
+        line_spacing = float(self.get_metadata()['LINE_SPACING'])
+        self.resize(line_spacing/self.pixel_size, eResampleAlg=-1) # averaging
+        if 'PixelFunctionType' in self.get_metadata(bandID='sigma0_VV').keys():
+            # Temporary workaround of nansencenter/nansat#41
+            s0 = self['s0tmp']
+        else:
+            s0 = self['sigma0_VV']
+        inci = self['incidence_angle']
         # consider changing cmod to use only one line of incidence angles
         windspeedcmod5 = cmod5n_inverse( s0, winddir_relative,
-                np.abs(self.incidence_angle()) )
+                inci )
         windspeedcmod5[np.where(np.isnan(s0))] = np.nan
         windspeedcmod5[np.where(np.isinf(s0))] = np.nan
-        return windspeedcmod5
+        # Resize self back to original
+        self.resize()
 
-    def incidence_angle(self, **kwargs):
-        inci = self.get_GDALRasterBand('incidence_angle').ReadAsArray(**kwargs)
-        if not np.isrealobj(inci[0][0]):
-            # try to open non-complex band
-            if self.has_band('incidence_angle_noncomplex'):
-                inci = self.get_GDALRasterBand('incidence_angle_noncomplex').ReadAsArray(**kwargs)
-                # Set invalid and missing data to np.nan
-                if inci.GetMetadata().has_key('_FillValue'):
-                    fillValue = float(inci.GetMetadata()['_FillValue'])
-                    inci[np.where(inci==fillValue)]=np.nan
-                inci[np.where(np.isinf(inci))] = np.nan
-            else:
-                inci = np.abs(self.get_GDALRasterBand('incidence_angle').ReadAsArray(**kwargs))
-                self.add_band(array=inci, parameters={
-                        'name': 'incidence_angle_noncomplex',
-                        'long_name': 'Non-complex incidence angle for correct netcdf export',
-                        'wkv': 'angle_of_incidence',
-                        'dataType': 6,
-                    }) 
-        ind=np.where(inci==0)
-        # set incidence angles which are 0 to np.nan (could also make some
-        # interpolation but that is for later improvements...)
-        inci[ind] = np.nan
-        return inci
+        # also returning s0 and inci because these are obtained with a
+        # different eResampleAlg
+        return windspeedcmod5, s0, inci
 
     def plot_example(self, model_wind=None, filename='windfield.png', dir='.'):
 
