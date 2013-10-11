@@ -12,15 +12,6 @@ import os
 from model_wind import ModelWind
 from cmod5n import cmod5n_inverse
 
-
-import matplotlib 
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import geographiclib.geodesic
-import mpl_toolkits
-from mpl_toolkits.basemap import Basemap
-import figure # figure module in nansat
-
 import pdb
 
 class SARWind(Nansat, object):
