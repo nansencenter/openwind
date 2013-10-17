@@ -57,7 +57,11 @@ class SARWind(Nansat, object):
         self.vrt = self.raw.copy()
 
         # Now reduce size of image 
-        line_spacing = float(self.get_metadata()['LINE_SPACING'])
+        try:
+            line_spacing = float(self.get_metadata()['LINE_SPACING'])
+        except:
+            # LINE_SPACING not defined in ASAR images
+            line_spacing = 50
         self.resize(line_spacing/self.pixel_size) 
         # copy reduced vrt to raw to get correct (reduced) size of the
         # model_wind object created below
