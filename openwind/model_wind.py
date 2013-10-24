@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	15.08.2013
-# Last modified:08.09.2013 13:24
+# Last modified:24.10.2013 14:29
 # Copyright:    (c) NERSC
 # License:      GNU GPL
 #-------------------------------------------------------------------------------
@@ -27,6 +27,7 @@ HIRLAM_wind_dir = [ # Add the location of your hirlam dir
                 ]
 NCEP_wind_dir = [   # Add the location of your ncep dir
                     '/Volumes/sat/auxdata/model/ncep/',
+                    '/Users/mortenh/ncep/',
                 ]
 
 class ModelWind(Nansat, object):
@@ -94,6 +95,7 @@ class ModelWind(Nansat, object):
             estr = estr + dir + '\n'
             if os.path.exists(dir):
                 hdir = dir
+                break
 
         if not 'hdir' in locals():
             raise Exception, estr
@@ -104,6 +106,7 @@ class ModelWind(Nansat, object):
         hfile = os.path.join( hdir, 'HIRLAM_10kmEurope_' + 
                     self.sar.get_time()[0].strftime('%Y%m%d') + '_' + hour + '.grib' )
 
+        print hfile
         return hfile
 
     def get_ncep_wind(self):
@@ -113,6 +116,7 @@ class ModelWind(Nansat, object):
             estr = estr + dir + '\n'
             if os.path.exists(dir):
                 ndir = dir
+                break
         if not 'ndir' in locals():
             raise Exception, estr
 
@@ -126,5 +130,5 @@ class ModelWind(Nansat, object):
         nfile = os.path.join( ndir, 'gfs',
                 'gfs'+self.sar.get_time()[0].strftime('%Y%m%d'),
                 'gfs.t%.2dz.master.grbf%.2d' %(basehour, forecasthour) )
-
+        print nfile
         return nfile
