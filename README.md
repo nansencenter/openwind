@@ -4,8 +4,8 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 
 # Installation
 
-- Add the folder OpenWind/ to your PYTHONPATH
-- Add the folder OpenWind/openwind to your PATH (for command line usage)
+- Add the top level folder openwind/ to your PYTHONPATH
+- Add the subfolder openwind/openwind/ to your PATH (for command line usage)
 
 # Command line usage:
 
