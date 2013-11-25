@@ -11,7 +11,7 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 - SAR_image is a file readable by Nansat, containing NRCS in VV polarisation
 
 - winddir is a file readable by Nansat, containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc)
-If winddirection is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
+If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
 
 # Python usage:
 ```
@@ -36,6 +36,7 @@ See code and comments therein for more features.
 # Notes:
 - GDAL might need to be compiled with the option --with-jasper to be able to read the downloaded NCEP GFS GRIB2-files
 - Due to a bug in Nansat (#43), the following workaround is needed before resizing ASAR images:
+
 ```
 >>> s_tmp = Nansat(ASAR_filename)
 
