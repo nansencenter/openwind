@@ -2,6 +2,37 @@
 
 OpenWind depends on Nansat (https://github.com/nansencenter/nansat). 
 
+# Command line usage:
+
+./openwind.py -s <SAR_image_filename> -w <winddirection> -f <figure_filename> -n <netCDF_filename> -r <resize_factor>
+
+- <SAR_image_filename> is a file readable by Nansat, containing NRCS in VV polarisation
+
+- <winddirection> is a file readable by Nansat, containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc)
+If <winddirection> is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
+
+# Python usage:
+
+>>> from openwind import openwind
+
+>>> s = openwind.SARwind(s, w) # To calculate SAR wind
+
+where 
+- s is a filename (string) or a corresponding Nansat object containing NRCS in VV polarisation. The SAR Nansat object should preferrably be resized to pixels at least 200 m size, but presently only non-reprojected SAR images are supported.
+
+- w is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc).
+
+
+>>> plt = s.plot() # to plot SAR wind overlaid wind vectors. A figure can be saved using the returned handle 'plt'
+
+See code and comments therein for more features.
+
+# Notes:
+- GDAL might need to be compiled with the option --with-jasper to be able to read the downloaded NCEP GFS GRIB2-files
+- Due to a bug in Nansat (#43), the following workaround is needed before resizing ASAR images:
+>>> s_tmp = Nansat(ASAR_filename)
+>>> s = Nansat(s_tmp.vrt.fileName)
+
 # Acknowledgments
 
 Thanks to the Royal Netherlands Meteorological Institute
