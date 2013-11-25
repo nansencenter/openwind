@@ -18,6 +18,12 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 - winddir is a file readable by Nansat, containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc)
 If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
 
+To see explanation of all features:
+```
+./openwind.py -h
+```
+
+
 # Python usage:
 ```
 >>> from openwind import openwind
@@ -28,7 +34,7 @@ If winddir is not given, OpenWind tries to download NCEP GFS model wind for the 
 where 
 - s is a filename (string) or a corresponding Nansat object containing NRCS in VV polarisation. The SAR Nansat object should preferrably be resized to pixels at least 200 m size, but presently only non-reprojected SAR images are supported.
 
-- w is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc).
+- w is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc). If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
 
 ```
 >>> plt = s.plot() # to plot SAR wind overlaid wind vectors.
