@@ -26,7 +26,9 @@ where
 - w is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc).
 
 ```
->>> plt = s.plot() # to plot SAR wind overlaid wind vectors. A figure can be saved using the returned handle 'plt'
+>>> plt = s.plot() # to plot SAR wind overlaid wind vectors.
+
+>>> plt.savefig(filename, bbox_inches='tight', dpi=300) # Save to file
 ```
 
 See code and comments therein for more features.
@@ -36,6 +38,7 @@ See code and comments therein for more features.
 - Due to a bug in Nansat (#43), the following workaround is needed before resizing ASAR images:
 ```
 >>> s_tmp = Nansat(ASAR_filename)
+
 >>> s = Nansat(s_tmp.vrt.fileName)
 ```
 
