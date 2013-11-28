@@ -6,6 +6,7 @@
 #               modify under the terms of GNU General Public License, v.3
 #               http://www.gnu.org/licenses/gpl-3.0.html
 
+import os
 import argparse
 
 import numpy as np
@@ -84,6 +85,7 @@ class SARWind(Nansat, object):
             if winddir is None:
                 raise ValueError('No NCEP file available for time of ' \
                         'SAR image. Can not calculate SAR wind speed.')
+            downloaded_wind_file = winddir
 
         if winddir == 'archive':
             # Use a function to find wind files in local archive
@@ -211,6 +213,13 @@ class SARWind(Nansat, object):
 
         # Copy all metadata from SAR image to wind object
         self.wind.set_metadata(self.get_metadata())
+
+        # Delete NCEP if it was downloaded 
+        try:
+            os.remove(downloaded_wind_file)
+            print 'Deleted downloaded wind file: ' + downloaded_wind_file
+        except:
+            pass
 
         # TODO: 
         # - add other CMOD versions than CMOD5
