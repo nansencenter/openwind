@@ -16,7 +16,7 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 - SAR_image is a file readable by Nansat, containing NRCS in VV polarisation
 
 - winddir is a file readable by Nansat, containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc)
-If winddir the string 'archive', OpenWind looks for matching win dfields in local file archive (not yet implemented)
+If winddir is the string 'archive', OpenWind looks for matching wind fields in local file archive (not yet implemented).
 If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
 
 To see explanation of all features:
@@ -27,26 +27,15 @@ To see explanation of all features:
 
 # Python usage:
 ```
->>> from openwind import sar_wind
+>>> from openwind import SARwind
 
->>> s = sar_wind.SARwind(s, w) # To calculate SAR wind
+>>> s = SARwind(SAR_image, winddir) # To calculate SAR wind
 ```
 
-- s is a filename (string) or a corresponding Nansat object containing NRCS in VV polarisation. The SAR Nansat object should preferrably be resized to pixels at least 200 m size, but presently only non-reprojected SAR images are supported.
+- SAR_image is a filename (string) or a corresponding Nansat object containing NRCS in VV polarisation. The SAR Nansat object should preferrably be resized to pixels at least 200 m size, but presently only non-reprojected SAR images are supported.
 
-- w is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc). If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
+- winddir is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc). If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
 
-
-The following explicit usage allows e.g. (not yet!) reprojecting the SARWind object before calculation of wind:
-```
->>> from openwind import sar_wind
-
->>> s = sar_wind.SARwind(s, winddir=None)
-
->>> s.reproject(some_domain)
-
->>> s.calculate_wind(winddir)
-```
 
 To plot the result and save as figure:
 ```
@@ -55,7 +44,19 @@ To plot the result and save as figure:
 >>> plt.savefig(filename, bbox_inches='tight', dpi=300) # Save to file
 ```
 
+The following explicit usage allows e.g. (not yet!) reprojecting the SARWind object before calculation of wind:
+```
+>>> from openwind import SARWind
+
+>>> s = SARwind(SAR_image, winddir=None) # Delay wind calculation
+
+>>> s.reproject(some_domain)
+
+>>> s.calculate_wind(winddir)
+```
+
 See code and comments therein for more features.
+
 
 # Notes:
 - GDAL might need to be compiled with the option --with-jasper to be able to read the downloaded NCEP GFS GRIB2-files
