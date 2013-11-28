@@ -10,32 +10,45 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 # Command line usage:
 
 ```
-./openwind.py -s SAR_image -w winddir -f figure_filename -n netCDF_filename -r resize_factor
+./sar_wind.py -s SAR_image -w winddir -f figure_filename -n netCDF_filename -r resize_factor
 ```
 
 - SAR_image is a file readable by Nansat, containing NRCS in VV polarisation
 
 - winddir is a file readable by Nansat, containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc)
+If winddir the string 'archive', OpenWind looks for matching win dfields in local file archive (not yet implemented)
 If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
 
 To see explanation of all features:
 ```
-./openwind.py -h
+./sar_wind.py -h
 ```
 
 
 # Python usage:
 ```
->>> from openwind import openwind
+>>> from openwind import sar_wind
 
->>> s = openwind.SARwind(s, w) # To calculate SAR wind
+>>> s = sar_wind.SARwind(s, w) # To calculate SAR wind
 ```
 
-where 
 - s is a filename (string) or a corresponding Nansat object containing NRCS in VV polarisation. The SAR Nansat object should preferrably be resized to pixels at least 200 m size, but presently only non-reprojected SAR images are supported.
 
 - w is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc). If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
 
+
+The following explicit usage allows e.g. (not yet!) reprojecting the SARWind object before calculation of wind:
+```
+>>> from openwind import sar_wind
+
+>>> s = sar_wind.SARwind(s, winddir=None)
+
+>>> s.reproject(some_domain)
+
+>>> s.calculate_wind(winddir)
+```
+
+To plot the result and save as figure:
 ```
 >>> plt = s.plot() # to plot SAR wind overlaid wind vectors.
 

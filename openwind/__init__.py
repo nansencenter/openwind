@@ -1,1 +1,1 @@
-from openwind import SARWind
+from sar_wind import SARWind
