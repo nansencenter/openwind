@@ -37,6 +37,10 @@ class SARWind(Nansat, object):
         # resize the regenerated Nansat object
         if 'inputSize' in locals() and inputSize != self.shape():
             self.resize(width=inputSize[1], height=inputSize[0])
+        else:
+            # Else resize by a factor of 0.1
+            self.resize(factor=0.1) # temporary solution
+
         # TODO: should issue error if input SAR image has been 
         # reprojected, as SAR look direction cannot be calculated
 
