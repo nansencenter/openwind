@@ -10,14 +10,18 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 # Command line usage:
 
 ```
-./sar_wind.py -s SAR_image -w winddir -f figure_filename -n netCDF_filename -r resize_factor
+./sar_wind.py -s SAR_image -w winddir -f figure_filename -n netCDF_filename -p pixelsize
 ```
 
 - SAR_image is a file readable by Nansat, containing NRCS in VV polarisation
 
-- winddir is a file readable by Nansat, containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc)
-If winddir is the string 'archive', OpenWind looks for matching wind fields in local file archive (not yet implemented).
-If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
+- winddir is either:
+  - a file readable by Nansat, containing wind direction (U10 and V10)
+  - an integer indicating constant wind direction (0 from North, 90 from East etc)
+  - the string 'archive': matching wind field is obtained from local file archive (not yet implemented)
+  - the string 'online' [DEFAULT]: NCEP GFS model wind is downloaded from NCEP NOMADS, if available for the time of the SAR image
+
+- pixelsize is given in meters (500 m by default). Use pixelsize='fullres' for no resizing (usually not recommended).
 
 To see explanation of all features:
 ```
@@ -29,12 +33,10 @@ To see explanation of all features:
 ```
 >>> from openwind import SARwind
 
->>> s = SARwind(SAR_image, winddir) # To calculate SAR wind
+>>> s = SARwind(SAR_image, winddir, pixelsize)
 ```
 
-- SAR_image is a filename (string) or a corresponding Nansat object containing NRCS in VV polarisation. The SAR Nansat object should preferrably be resized to pixels at least 200 m size, but presently only non-reprojected SAR images are supported.
-
-- winddir is a filename (string) or a corresponding Nansat object containing wind direction (U10 and V10), or an integer indicating constant wind direction (0 from North, 90 from East etc). If winddir is not given, OpenWind tries to download NCEP GFS model wind for the time of the SAR image.
+See above (command line usage) for specification of the input parameters.
 
 
 To plot the result and save as figure:
@@ -44,29 +46,22 @@ To plot the result and save as figure:
 >>> plt.savefig(filename, bbox_inches='tight', dpi=300) # Save to file
 ```
 
-The following explicit usage allows e.g. (not yet!) reprojecting the SARWind object before calculation of wind:
+If winddir is not specified when the SARWind object is generated with the Python API, wind speed is not automatically calculated. This allows modification of the SAR image (e.g. resizing or cropping) before wind speed calculation:
 ```
 >>> from openwind import SARWind
 
->>> s = SARwind(SAR_image, winddir=None) # Delay wind calculation
+>>> s = SARwind(SAR_image)
 
->>> s.reproject(some_domain)
+>>> s.crop(lonlim=[5, 6], latlim=[60, 61])
 
 >>> s.calculate_wind(winddir)
 ```
 
-See code and comments therein for more features.
+Calculation of SAR wind after reprojection is not yet supported.
 
 
 # Notes:
 - GDAL might need to be compiled with the option --with-jasper to be able to read the downloaded NCEP GFS GRIB2-files
-- Due to a bug in Nansat (#43), the following workaround is needed before resizing ASAR images:
-
-```
->>> s_tmp = Nansat(ASAR_filename)
-
->>> s = Nansat(s_tmp.vrt.fileName)
-```
 
 # Acknowledgments
 
