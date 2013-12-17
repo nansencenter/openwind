@@ -35,7 +35,7 @@ class SARWind(Nansat, object):
             raise TypeError(self.fileName + 
                     ' does not have SAR NRCS in VV polarization')
         
-        if os.path.splitext(self.fileName)[1]=='.nc':
+        if 'U' in names and 'V' in names:
             return
 
         if 'PixelFunctionType' in self.get_metadata(bandID='sigma0_VV').keys():
