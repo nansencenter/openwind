@@ -25,7 +25,7 @@ class SARWind(Nansat, object):
     A class for calculating wind speed from SAR images using CMOD
     '''
 
-    def __init__(self, SAR_filename, winddir=None, pixelsize=500):
+    def __init__(self, SAR_filename, winddir='online', pixelsize=500):
 
         # Call constructor of superclass Nansat
         super(SARWind, self).__init__(SAR_filename)
@@ -67,7 +67,7 @@ class SARWind(Nansat, object):
         # Try to fetch NCEP wind data online 
         #   if wind direction is not given
         if winddir == 'online':
-            print 'Donwloading online NCEP GFS wind...'
+            print 'Downloading online NCEP GFS wind...'
             import download_NCEP_GFS
             winddir = download_NCEP_GFS.download_ncep(
                             self.get_time()[self.sigma0_bandNo - 1])
@@ -220,7 +220,7 @@ class SARWind(Nansat, object):
         Ux = np.sin(np.radians(winddir_relative_up[Y, X]))
         Vx = np.cos(np.radians(winddir_relative_up[Y, X]))
         plt.imshow(sar_windspeed)
-        plt.clim([0, 18])
+        plt.clim([3, 10])
         cbar = plt.colorbar()
         plt.quiver(X, Y, Ux, Vx, angles='xy')
         plt.axis('off')
