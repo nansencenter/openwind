@@ -2,6 +2,67 @@
 
 OpenWind depends on Nansat (https://github.com/nansencenter/nansat). 
 
+# Installation
+
+- Add the top level folder openwind/ to your PYTHONPATH
+- Add the subfolder openwind/openwind/ to your PATH (for command line usage)
+
+# Command line usage:
+
+```
+./sar_wind.py -s SAR_image -w winddir -f figure_filename -n netCDF_filename -p pixelsize
+```
+
+- SAR_image is a file readable by Nansat, containing NRCS in VV polarisation
+
+- winddir is either:
+  - a file readable by Nansat, containing wind direction (U10 and V10)
+  - an integer indicating constant wind direction (0 from North, 90 from East etc)
+  - the string 'archive': matching wind field is obtained from local file archive (not yet implemented)
+  - the string 'online' [DEFAULT]: NCEP GFS model wind is downloaded from NCEP NOMADS, if available for the time of the SAR image
+
+- pixelsize is given in meters (500 m by default). Use pixelsize='fullres' for no resizing (usually not recommended).
+
+To see explanation of all features:
+```
+./sar_wind.py -h
+```
+
+
+# Python usage:
+```
+>>> from openwind import SARwind
+
+>>> s = SARwind(SAR_image, winddir, pixelsize)
+```
+
+See above (command line usage) for specification of the input parameters.
+
+
+To plot the result and save as figure:
+```
+>>> plt = s.plot() # to plot SAR wind overlaid wind vectors.
+
+>>> plt.savefig(filename, bbox_inches='tight', dpi=300) # Save to file
+```
+
+If winddir is not specified when the SARWind object is generated with the Python API, wind speed is not automatically calculated. This allows modification of the SAR image (e.g. resizing or cropping) before wind speed calculation:
+```
+>>> from openwind import SARWind
+
+>>> s = SARwind(SAR_image)
+
+>>> s.crop(lonlim=[5, 6], latlim=[60, 61])
+
+>>> s.calculate_wind(winddir)
+```
+
+Calculation of SAR wind after reprojection is not yet supported.
+
+
+# Notes:
+- GDAL might need to be compiled with the option --with-jasper to be able to read the downloaded NCEP GFS GRIB2-files
+
 # Acknowledgments
 
 Thanks to the Royal Netherlands Meteorological Institute

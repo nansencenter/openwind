@@ -2,11 +2,11 @@
 # Name:		model_wind.py
 # Purpose:      
 #
-# Author:       Morten Wergeland Hansen
+# Author:       Morten Wergeland Hansen, Knut-Frode Dagestad
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	15.08.2013
-# Last modified:24.10.2013 14:29
+# Last modified:19.12.2013 16:43
 # Copyright:    (c) NERSC
 # License:      GNU GPL
 #-------------------------------------------------------------------------------
@@ -14,121 +14,141 @@ from nansat import Nansat
 
 import os
 import numpy as np
+from datetime import datetime, timedelta
 
 import pdb
 
-# Locations of the grib-files are hardcoded to my local directory for now.
-# Later, the model wind field should be retrieved from an online service...
-
-# REMEMBER TO MODIFY THESE LISTS TO SUIT YOUR LOCAL SYSTEM:
-HIRLAM_wind_dir = [ # Add the location of your hirlam dir
-                    '/Volumes/sat/auxdata/model/met.no/',
-                    '/Users/mortenh/met.no/',
-                ]
-NCEP_wind_dir = [   # Add the location of your ncep dir
-                    '/Volumes/sat/auxdata/model/ncep/',
-                    '/Users/mortenh/ncep/',
-                ]
+openWindFolder = os.path.dirname(__file__)
+get_inv = os.path.join(openWindFolder, 'get_inv.pl ')
+get_grib = os.path.join(openWindFolder, 'get_grib.pl ')
 
 class ModelWind(Nansat, object):
 
-    def __init__(self, sar, *args, **kwargs):
+    def __init__(self, time=None, wind=None, domain=None, *args, **kwargs):
         '''
-            Set parameters needed to get the model wind field
+            Get model wind field, and optionally reproject it to a given
+            domain.
 
-            Presently, a Nansat sar object is used. This is a bit heavy and
-            should probably be replaced by a simpler nansat.Domain object and
-            a time.
+            At least 'time' or 'wind' (filename or Nansat object) is required
+            as input. The 'time' input is ignored if both are provided.
+            
+            Parameters
+            -----------
+            time : datetime - the appreciated time of the model wind field
+            wind : string or Nansat
+            domain : nansat Domain
         '''
-        if isinstance(sar,basestring):
-            self.sar = Nansat(sar)
+        if not time and not wind:
+            raise ValueError(
+                    "At least 'time' or 'wind' is required as input"
+                    )
+        
+        self.downloaded = ''
+
+        if wind:
+            if isinstance(wind, str):
+                super(ModelWind, self).__init__(wind)
+            elif isinstance(wind, Nansat):
+                super(ModelWind, self).__init__(wind.fileName)
+                self.reproject(wind)
+            # Check if Nansat object contains wind direction
+            try:
+                wind_u_bandNo = self._get_band_number(
+                                {'standard_name': 'eastward_wind'})
+            except:
+                raise TypeError(self.fileName +
+                    ' does not contain wind direction')
         else:
-            self.sar = sar
-        gribfile = self.get_hirlam_wind()
-        success = True
-        if os.path.exists(gribfile):
-            super(ModelWind, self).__init__(gribfile, *args, **kwargs)
-            if not self.check_coverage():
-                ## delete HIRLAM file
-                #os.remove(self.windGribFile)
-                #super(ModelWind, self).__del__()
-                print 'No HIRLAM coverage, trying NCEP...'
-                gribfile = self.get_ncep_wind()
-                success = False
-        else:
-            print 'No HIRLAM wind file, trying NCEP...'
-            gribfile = self.get_ncep_wind()
-            success = False
-        if not success:
-            if os.path.exists(gribfile):
-                success = True
-                super(ModelWind, self).__init__(gribfile, *args, **kwargs)
+            if not isinstance(time, datetime):
+                raise TypeError('Time input must be a datetime object')
             else:
-                raise IOError('Cannot locate model wind field information')
-        # Reproject model wind field to SAR image coverage
-        self.reproject(self.sar)
+                self.downloaded = self.download_ncep(time)
+                if self.downloaded is None:
+                    raise ValueError('No NCEP file available for time of ' \
+                        'SAR image. Can not calculate SAR wind speed.')
+                super(ModelWind, self).__init__(self.downloaded)
+                wind_u_bandNo = self._get_band_number(
+                                {'standard_name': 'eastward_wind'})
+
+        self.time = self.get_time(wind_u_bandNo)
+
+        if domain:
+            # Bi-linear interpolation onto given domain
+            self.reproject(domain, eResampleAlg=1)
 
     def __del__(self):
-        if hasattr(self, 'windGribFile') and os.path.exists(self.windGribFile):
-            # Delete grib-file
-            os.remove(self.windGribFile)
+        if self.downloaded and os.path.exists(self.downloaded):
+            # Delete downloaded wind file
+            os.remove(self.downloaded)
 
-    def check_coverage(self):
+    def check_coverage(self, domain):
         lon_covered =\
-                np.min(self.sar.get_corners()[0])>=np.min(self.get_corners()[0]) \
+                np.min(domain.get_corners()[0])>=np.min(self.get_corners()[0]) \
                 and \
-                np.max(self.sar.get_corners()[0])<=np.max(self.get_corners()[0])
+                np.max(domain.get_corners()[0])<=np.max(self.get_corners()[0])
         lat_covered =\
-                np.min(self.sar.get_corners()[1])>=np.min(self.get_corners()[1]) \
+                np.min(domain.get_corners()[1])>=np.min(self.get_corners()[1]) \
                 and \
-                np.max(self.sar.get_corners()[1])<=np.max(self.get_corners()[1])
+                np.max(domain.get_corners()[1])<=np.max(self.get_corners()[1])
         if not lon_covered or not lat_covered:
             return False
         else:
             return True
 
-    def get_hirlam_wind(self):
-        #'windfile': 'model_wind/HIRLAM_10kmEurope_20120615_1200.grib'
-        # HIRLAM wind file 
-        estr = 'Make sure one of these directories are connected:\n\n'
-        for dir in HIRLAM_wind_dir:
-            estr = estr + dir + '\n'
-            if os.path.exists(dir):
-                hdir = dir
-                break
-
-        if not 'hdir' in locals():
-            raise Exception, estr
-
-        hour = '1200'
-        if self.sar.get_time()[0].hour + self.sar.get_time()[0].minute/60.0 < 13.5:
-            hour = '0000'
-        hfile = os.path.join( hdir, 'HIRLAM_10kmEurope_' + 
-                    self.sar.get_time()[0].strftime('%Y%m%d') + '_' + hour + '.grib' )
-
-        print hfile
-        return hfile
-
-    def get_ncep_wind(self):
-        # NCEP wind file 
-        estr = 'Make sure one of these directories are connected:\n\n'
-        for dir in NCEP_wind_dir:
-            estr = estr + dir + '\n'
-            if os.path.exists(dir):
-                ndir = dir
-                break
-        if not 'ndir' in locals():
-            raise Exception, estr
-
-        basehour = np.floor((self.sar.get_time()[0].hour + self.sar.get_time()[0].minute/60.0 +
-            3.0/2.0 )/6.0)*6.0
-        basehour = np.min([18, basehour])
-        if self.sar.get_time()[0].hour + self.sar.get_time()[0].minute/60.0 - basehour > 1.5:
-            forecasthour = 3
+    def download_ncep(self, time, outFolder = ''):
+    
+        time = time.replace(tzinfo=None) # Remove timezone information
+        # Find closest 6 hourly modelrun and forecast hour
+        modelRunHour = round((time.hour + time.minute/60.)/6)*6
+        nearestModelRun = datetime(time.year, time.month, time.day) \
+            + timedelta(hours=modelRunHour)
+        forecastHour = (time - nearestModelRun).total_seconds()/3600.
+        if forecastHour < 1.5:
+            forecastHour = 0
         else:
-            forecasthour = 0
-        nfile = os.path.join( ndir, 'gfs',
-                'gfs'+self.sar.get_time()[0].strftime('%Y%m%d'),
-                'gfs.t%.2dz.master.grbf%.2d' %(basehour, forecasthour) )
-        print nfile
-        return nfile
+            forecastHour = 3
+    
+        # Try to get NRT data from 
+        # ftp://ftp.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/
+        # Avaliable approximately the latest month
+        url = 'ftp://ftp.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/' \
+                + 'gfs.' + time.strftime('%Y%m%d') + '%.2d' % modelRunHour \
+                + '/gfs.t' + '%.2d' % modelRunHour + 'z.master.grbf' \
+                + '%.2d' % forecastHour + '.10m.uv.grib2'
+        outFileName = outFolder + 'ncep_gfs_' + nearestModelRun.strftime(
+                    '%Y%m%d_%HH_') + '%.2d' % forecastHour + '.10m.uv.grib2'
+        if os.path.exists(outFileName):
+            print 'NCEP wind is already downloaded: ' + outFileName
+            return outFileName
+        else:
+            os.system('curl -o ' + outFileName + ' ' + url)
+            if os.path.exists(outFileName):
+                print 'Downloaded ' + outFileName
+                return outFileName
+            else:
+                print 'NRT GRIB file not available: ' + url
+    
+        # If NRT file not available, 
+        # coninue to search for archived file
+        url = 'http://nomads.ncdc.noaa.gov/data/gfs4/' + \
+            nearestModelRun.strftime('%Y%m/%Y%m%d/')
+        baseName = 'gfs_4_' + nearestModelRun.strftime('%Y%m%d_') \
+                + nearestModelRun.strftime('%H%M_') \
+                + '%.3d' % forecastHour
+        fileName = baseName + '.grb2'
+        outFileName = outFolder + fileName
+        print 'Downloading ' + url + fileName
+    
+        # Download subset of grib file
+        if not os.path.exists(fileName):
+            command = get_inv + url + baseName \
+                  + '.inv | egrep "(:UGRD:10 m |:VGRD:10 m )" | ' \
+                  + get_grib + url + fileName + ' ' + outFileName
+            os.system(command)
+        else:
+            print 'Already downloaded'
+        if os.path.exists(outFileName):
+            return outFileName
+        else:
+            return None
+
