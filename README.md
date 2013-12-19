@@ -18,8 +18,7 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 - winddir is either:
   - a file readable by Nansat, containing wind direction (U10 and V10)
   - an integer indicating constant wind direction (0 from North, 90 from East etc)
-  - the string 'archive': matching wind field is obtained from local file archive (not yet implemented)
-  - the string 'online' [DEFAULT]: NCEP GFS model wind is downloaded from NCEP NOMADS, if available for the time of the SAR image
+  - None or omitted [DEFAULT]: NCEP GFS model wind is downloaded from NCEP NOMADS, if available for the time of the SAR image
 
 - pixelsize is given in meters (500 m by default). Use pixelsize='fullres' for no resizing (usually not recommended).
 
@@ -46,18 +45,20 @@ To plot the result and save as figure:
 >>> plt.savefig(filename, bbox_inches='tight', dpi=300) # Save to file
 ```
 
-If winddir is not specified when the SARWind object is generated with the Python API, wind speed is not automatically calculated. This allows modification of the SAR image (e.g. resizing or cropping) before wind speed calculation:
+If winddir is not specified when the SARWind object is generated with the Python API, wind speed is automatically calculated using ncep model wind downloaded from NCEP NOMADS. You can modify the SAR image (e.g. resizing or cropping) before calling SARWind as long as the SAR image file is not a previously exported reprojected/resized/cropped image:
 ```
 >>> from openwind import SARWind
 
->>> s = SARwind(SAR_image)
+>>> from nansat import Nansat
 
->>> s.crop(lonlim=[5, 6], latlim=[60, 61])
+>>> n = Nansat(SAR_image)
 
->>> s.calculate_wind(winddir)
+>>> n.crop(lonlim=[5, 6], latlim=[60, 61])
+
+>>> s = SARWind(n)
 ```
 
-Calculation of SAR wind after reprojection is not yet supported.
+Note that this is slower than first calculating the wind, then doing the modifications.
 
 
 # Notes:
