@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	15.08.2013
-# Last modified:18.12.2013 17:35
+# Last modified:19.12.2013 14:19
 # Copyright:    (c) NERSC
 # License:      GNU GPL
 #-------------------------------------------------------------------------------
@@ -34,9 +34,9 @@ class ModelWind(Nansat, object):
             
             Parameters
             -----------
-            time : 
-            wind :
-            domain :
+            time : datetime - the appreciated time of the model wind field
+            wind : string or Nansat
+            domain : nansat Domain
         '''
         if not time and not wind:
             raise ValueError(
@@ -49,13 +49,12 @@ class ModelWind(Nansat, object):
             if isinstance(wind, str):
                 super(ModelWind, self).__init__(wind)
             elif isinstance(wind, Nansat):
-                self = wind
+                super(ModelWind, self).__init__(wind.fileName)
+                self.reproject(wind)
             # Check if Nansat object contains wind direction
             try:
                 wind_u_bandNo = self._get_band_number(
                                 {'standard_name': 'eastward_wind'})
-                wind_v_bandNo = self._get_band_number(
-                                {'standard_name': 'northward_wind'})
             except:
                 raise TypeError(self.fileName +
                     ' does not contain wind direction')
@@ -63,13 +62,15 @@ class ModelWind(Nansat, object):
             if not isinstance(time, datetime):
                 raise TypeError('Time input must be a datetime object')
             else:
-                pdb.set_trace()
                 self.downloaded = self.download_ncep(time)
+                if self.downloaded is None:
+                    raise ValueError('No NCEP file available for time of ' \
+                        'SAR image. Can not calculate SAR wind speed.')
                 super(ModelWind, self).__init__(self.downloaded)
-                #wind_u_bandNo = self._get_band_number(
-                #                {'standard_name': 'eastward_wind'})
+                wind_u_bandNo = self._get_band_number(
+                                {'standard_name': 'eastward_wind'})
 
-        #self.time = self.get_time(wind_u_bandNo)
+        self.time = self.get_time(wind_u_bandNo)
 
         if domain:
             # Bi-linear interpolation onto given domain
