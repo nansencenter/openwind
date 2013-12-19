@@ -258,8 +258,8 @@ if __name__ == '__main__':
             required=True, help='SAR image filename')
     parser.add_argument('-w', dest='winddir', 
             default='online', help='Wind direction filename or constant '
-                ' (integer, 0 for wind from North, 90 for wind from East etc.) '
-                'Use string "online" for automatic download of NCEP GFS winds')
+                ' (integer, 0 for wind from North, 90 for wind from East etc.). '
+                'Omit this argument for automatic download of NCEP GFS winds.')
     parser.add_argument('-n', dest='netCDF', 
             help='Export numerical output to NetCDF file')
     parser.add_argument('-f', dest='figure_filename', 
