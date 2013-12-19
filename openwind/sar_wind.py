@@ -127,10 +127,13 @@ class SARWind(Nansat, object):
         '''
         self.winddir=winddir
 
-    def calculate_wind(self, storeModelSpeed=False):
+    def calculate_wind(self, winddir=None, storeModelSpeed=False):
         '''
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
+
+        if winddir:
+            self.set_auxiliary(winddir)
 
         if not isinstance(self.winddir, int):
             aux = self.get_auxiliary()
@@ -217,7 +220,7 @@ class SARWind(Nansat, object):
         overlaid vectors in SAR image projection'''
 
         try:
-            sar_windspeed = self['sar_windspeed']
+            sar_windspeed = self['windspeed']
         except:
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(winddir) before plotting.')
@@ -225,7 +228,7 @@ class SARWind(Nansat, object):
         winddirReductionFactor = np.round(
                 self.vrt.dataset.RasterXSize/numVectorsX)
         # model_winddir is direction from which wind is blowing
-        winddir_relative_up = 360 - self['model_winddir'] + \
+        winddir_relative_up = 360 - self['winddirection'] + \
                                     self.azimuth_up()
         X, Y = np.meshgrid(range(0, self.vrt.dataset.RasterXSize, 
                                     winddirReductionFactor),
@@ -266,20 +269,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.figure_filename is None and args.netCDF is None:
-        raise ValueError('Not much point in calculating SAR wind '\
-            'if output is not saved as figure or netCDF...' \
-            '\nTa deg en bolle!')
-
-    # Read SAR image
-    sw = SARWind(args.SAR_filename, pixelsize=args.pixelsize)
+        raise ValueError('Please add filename of processed figure (-f) or' \
+                ' netcdf (-n)')
 
     # Get wind direction
     try:
         winddir = int(args.winddir)
     except:
         winddir = args.winddir
-    # Calculate wind
-    sw.calculate_wind(winddir)
+
+    # Read SAR image
+    sw = SARWind(args.SAR_filename, pixelsize=args.pixelsize)
 
     # Save figure
     if args.figure_filename is not None:
