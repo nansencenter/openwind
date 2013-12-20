@@ -32,9 +32,8 @@ class SARWind(Nansat, object):
         '''
             Parameters
             -----------
-            sar_image : string or Nansat
-                        Can be either a Nansat instance of a SAR acquisition, or a
-                        filename.
+            sar_image : string 
+                        The SAR image filename - should be the original file.
             winddir :   int, string, Nansat, None
                         Auxiliary wind field information needed to calculate
                         SAR wind (must be or have wind direction)
@@ -42,11 +41,13 @@ class SARWind(Nansat, object):
         if isinstance(sar_image, str) or isinstance(sar_image, unicode):
             super(SARWind, self).__init__(sar_image)
         elif isinstance(sar_image, Nansat):
-            warnings.warn('Using Nansat object to calculate wind. Note that' \
-                    ' any previous reprojection is repeated to' \
-                    ' maintain correct azimuth.') 
-            super(SARWind, self).__init__(sar_image.fileName)
-            self.reproject(sar_image)
+            raise TypeError('Use of Nansat objects as input to SARWind is' \
+                    ' disabled in the master branch.')
+            #warnings.warn('Using Nansat object to calculate wind. Note that' \
+            #        ' any previous reprojection is repeated to' \
+            #        ' maintain correct azimuth.') 
+            #super(SARWind, self).__init__(sar_image.fileName)
+            #self.reproject(sar_image)
 
         # Check that this is a SAR image with VV pol NRCS
         try:
