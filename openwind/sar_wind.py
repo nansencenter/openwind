@@ -6,7 +6,6 @@
 #               modify under the terms of GNU General Public License, v.3
 #               http://www.gnu.org/licenses/gpl-3.0.html
 
-import os
 import argparse
 
 import numpy as np
@@ -17,6 +16,7 @@ except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
 from nansat import Nansat
+from model_wind import ModelWind
 from cmod5n import cmod5n_inverse
 
 
@@ -26,8 +26,15 @@ class SARWind(Nansat, object):
     '''
 
     def __init__(self, SAR_filename, winddir=None, pixelsize=500):
-
-        # Call constructor of superclass Nansat
+        '''
+            Parameters
+            -----------
+            SAR_filename : string
+                SAR image filename (original, raw file)
+            winddir : int, string, Nansat, None
+                Auxiliary wind field information needed to calculate
+                SAR wind (must be or have wind direction)
+        '''
         super(SARWind, self).__init__(SAR_filename)
 
         # Check that this is a SAR image with VV pol NRCS
@@ -47,163 +54,124 @@ class SARWind(Nansat, object):
             print 'Resizing SAR image to ' + str(pixelsize) + ' m pixel size'
             self.resize(pixelsize=pixelsize)
 
-        # Calculate wind directly, if requested by user
+        self.winddir = winddir
         if winddir is not None:
-            self.calculate_wind(winddir)
+            self.calculate_wind()
 
-
-    def reproject(self):
-        # Placeholder for future reprojection function
-        # overloading Nansat.reproject(), after calculating
-        # SAR look direction and storing as NumPy array
-        raise TypeError('Reprojection not yet implemented!')
-
-
-    def calculate_wind(self, winddir='online'):
-
-        #########################################################
-        # Check wind direction input
-        #########################################################
-        # Try to fetch NCEP wind data online 
-        #   if wind direction is not given
-        if winddir == 'online':
-            print 'Donwloading online NCEP GFS wind...'
-            import download_NCEP_GFS
-            winddir = download_NCEP_GFS.download_ncep(
-                            self.get_time()[self.sigma0_bandNo - 1])
-            if winddir is None:
-                raise ValueError('No NCEP file available for time of ' \
-                        'SAR image. Can not calculate SAR wind speed.')
-            downloaded_wind_file = winddir
-
-        if winddir == 'archive':
-            # Use a function to find wind files in local archive
-            # To be implemented
-            raise ValueError('Archive functionality not yet implemented.')
-
-        # Filename is given as input
-        if isinstance(winddir, str):
-            winddir = Nansat(winddir)
-
-        # A Nansat object is given as input, or read from filename
-        if isinstance(winddir, Nansat):
-            self.vrt.dataset.SetMetadataItem('Model wind field',
-                winddir.mapper[7:])
-            # Check if Nansat object contains wind direction
-            try:
-                windspeed_bandNo = winddir._get_band_number(
-                                {'standard_name': 'wind_speed'})
-                wind_u_bandNo = winddir._get_band_number(
-                                {'standard_name': 'eastward_wind'})
-                wind_v_bandNo = winddir._get_band_number(
-                                {'standard_name': 'northward_wind'})
-            except:
-                raise TypeError(winddir.fileName + +
-                    ' does not contain wind direction')
-
-            # Check time difference between SAR image and wind direction object
-            try:
-                winddir_time = winddir.get_time(
-                        wind_u_bandNo).replace(tzinfo=None)
-                timediff = self.SAR_image_time - winddir_time
-                hoursDiff = np.abs(timediff.total_seconds()/3600.)
-                print 'Time difference between SAR image and wind direction: ' \
-                        + '%.2f' % hoursDiff + ' hours'
-                print 'SAR image time: ' + str(self.SAR_image_time)
-                print 'Wind dir time: ' + str(winddir_time)
-                if hoursDiff > 3:
-                    print '#########################################'
-                    print 'WARNING: time difference exceeds 3 hours!'
-                    print '#########################################'
-            except:
-                winddir_time = None
-                print '#############################################'
-                print 'WARNING: time of wind direction is not given!'
-                print '#############################################'
-
-
-            # TODO:
-            # - if several instances, 
-            #       choose the one closest in time to SAR image
-            # - check that surface (10 m) winds are chosen
-            # - should check if wind object really covers SAR image
-            # - allow use of Nansat objects containing winddirection,
-            #       and not the U and V components
-
-            # Reproject wind field onto SAR image
-
-            # Bi-linear interpolation of wind onto SAR image domain
-            winddir.reproject(self, eResampleAlg=1)
-
-            # Get wind direction
-            u_array = winddir[wind_u_bandNo]
-            v_array = winddir[wind_v_bandNo]
-            winddirArray = np.degrees(
-                    np.arctan2(-u_array, -v_array)) # 0 from North, 90 from East
-            windspeedModel = winddir[windspeed_bandNo]
-     
-        # Constant wind direction is input
-        if isinstance(winddir, int):
-            print 'Using constant wind (from) direction: ' + str(winddir) + \
-                    ' degrees clockwise from North'
-            winddirArray = np.ones(self.shape())*winddir
-            winddir_time = None
-
-        #########################################################
-        # Calculate SAR wind with CMOD
-        #########################################################
-        print 'Calculating SAR wind with CMOD...'
-        # Find look direction
-        # Note: this method is only correct for unprojected SAR images!
+    def set_look_direction(self):
+        # This function should be replaced by a band added by the SAR mappers -
+        # see https://github.com/nansencenter/nansat/issues/57
         if self.get_metadata()['ANTENNA_POINTING'] == 'RIGHT':
             look_direction = self.azimuth_up() + 90
         else:
             look_direction = self.azimuth_up() - 90
+        self.add_band(array=look_direction, parameters={
+                        'name': 'sar_look_direction',
+                        'time': self.get_time(self.sigma0_bandNo),
+                })
 
-        winddir_relative_look = np.mod(winddirArray - look_direction, 360)
-        windspeedCMOD = cmod5n_inverse(self[self.sigma0_bandNo], 
-            winddir_relative_look, self['incidence_angle'])
+    def reproject(self, *args, **kwargs):
+        # Overloading Nansat.reproject()
+        # Calculate SAR look direction before reprojection, and store as
+        # NumPy band to avoid problems due to modified domain orientation
+        if not self.has_band('sar_look_direction'):
+            self.set_look_direction()
+        super(SARWind, self).reproject(*args, **kwargs)
 
-        windspeedCMOD[np.where(np.isnan(windspeedCMOD))] = np.nan
-        windspeedCMOD[np.where(np.isinf(windspeedCMOD))] = np.nan
+    def calculate_wind(self, winddir=None, storeModelSpeed=False):
+        # Calculate wind speed from SAR sigma0 in VV polarization
+        if winddir:
+            self.winddir = winddir
+
+        if not isinstance(self.winddir, int):
+            if self.winddir is None:
+                self.modelWind = ModelWind(self.SAR_image_time, domain=self)
+            else:
+                self.modelWind = ModelWind(wind=self.winddir, domain=self)
+            winddir_time = self.modelWind.time 
+
+            # Check time difference between SAR image and wind direction object
+            timediff = self.SAR_image_time - winddir_time
+            hoursDiff = np.abs(timediff.total_seconds()/3600.)
+            print 'Time difference between SAR image and wind direction: ' \
+                    + '%.2f' % hoursDiff + ' hours'
+            print 'SAR image time: ' + str(self.SAR_image_time)
+            print 'Wind dir time: ' + str(winddir_time)
+            if hoursDiff > 3:
+                print '#########################################'
+                print 'WARNING: time difference exceeds 3 hours!'
+                print '#########################################'
+
+            wind_u_bandNo = self.modelWind._get_band_number({
+                                'standard_name': 'eastward_wind',
+                            })
+            wind_v_bandNo = self.modelWind._get_band_number({
+                                'standard_name': 'northward_wind',
+                            })
+            # Get wind direction
+            u_array = self.modelWind[wind_u_bandNo]
+            v_array = self.modelWind[wind_v_bandNo]
+            winddirArray = np.degrees(
+                    np.arctan2(-u_array, -v_array)) # 0 from North, 90 from East
+        else:
+            # Constant wind direction is input
+            print 'Using constant wind (from) direction: ' + str(self.winddir) + \
+                    ' degrees clockwise from North'
+            winddirArray = np.ones(self.shape())*self.winddir
+            winddir_time = None
+
+        # Calculate SAR wind with CMOD
+        # TODO: 
+        # - add other CMOD versions than CMOD5
+        print 'Calculating SAR wind with CMOD...'
+        if not self.has_band('sar_look_direction'):
+            self.set_look_direction()
+
+        windspeed = cmod5n_inverse(self[self.sigma0_bandNo], 
+                            np.mod(winddirArray - self['sar_look_direction'], 360), 
+                            self['incidence_angle'])
+
+        windspeed[np.where(np.isnan(windspeed))] = np.nan
+        windspeed[np.where(np.isinf(windspeed))] = np.nan
 
         # Add wind speed and direction as bands
-        self.add_band(array=windspeedCMOD, parameters={
+        # TODO: make it possible to update existing bands... See
+        # https://github.com/nansencenter/nansat/issues/58
+        self.add_band(array=windspeed, parameters={
                         'wkv': 'wind_speed',
-                        'name': 'sar_windspeed',
+                        'name': 'windspeed',
                         'time': self.get_time(self.sigma0_bandNo),
                         'winddir_time': winddir_time
                 })
         self.add_band(array=winddirArray, parameters={
                             'wkv': 'wind_from_direction',
-                            'name': 'model_winddir',
+                            'name': 'winddirection',
                             'time': winddir_time
                 })
-        if isinstance(winddir, Nansat):
-            self.add_band(array=windspeedModel, parameters={
+
+        if storeModelSpeed:
+            self.add_band(array=self.modelWind['windspeed'], parameters={
                             'wkv': 'wind_speed',
                             'name': 'model_windspeed',
-                            'time': self.get_time(self.sigma0_bandNo),
-                            'winddir_time': winddir_time
-                    })
+                            'time': winddir_time,
+            })
 
-        # Delete NCEP if it was downloaded 
-        try:
-            os.remove(downloaded_wind_file)
-            print 'Deleted downloaded wind file: ' + downloaded_wind_file
-        except:
-            pass
-
-        # TODO: 
-        # - add other CMOD versions than CMOD5
-
+        # TODO: Replace U and V bands with pixelfunctions
+        u = -windspeed*np.sin((180.0 - winddirArray)*np.pi/180.0)
+        v = windspeed*np.cos((180.0 - winddirArray)*np.pi/180.0)
+        self.add_band(array=u, parameters={
+                            'wkv': 'eastward_wind',
+        })
+        self.add_band(array=v, parameters={
+                            'wkv': 'northward_wind',
+        })
 
     def plot(self, numVectorsX = 20, show=True):
         ''' Basic plotting function showing CMOD wind speed
         overlaid vectors in SAR image projection'''
 
         try:
-            sar_windspeed = self['sar_windspeed']
+            sar_windspeed = self['windspeed']
         except:
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(winddir) before plotting.')
@@ -211,7 +179,7 @@ class SARWind(Nansat, object):
         winddirReductionFactor = np.round(
                 self.vrt.dataset.RasterXSize/numVectorsX)
         # model_winddir is direction from which wind is blowing
-        winddir_relative_up = 360 - self['model_winddir'] + \
+        winddir_relative_up = 360 - self['winddirection'] + \
                                     self.azimuth_up()
         X, Y = np.meshgrid(range(0, self.vrt.dataset.RasterXSize, 
                                     winddirReductionFactor),
@@ -229,7 +197,6 @@ class SARWind(Nansat, object):
         return plt
 
 
-
 ###################################
 #    If run from command line
 ###################################
@@ -240,8 +207,8 @@ if __name__ == '__main__':
             required=True, help='SAR image filename')
     parser.add_argument('-w', dest='winddir', 
             default='online', help='Wind direction filename or constant '
-                ' (integer, 0 for wind from North, 90 for wind from East etc.) '
-                'Use string "online" for automatic download of NCEP GFS winds')
+                ' (integer, 0 for wind from North, 90 for wind from East etc.). '
+                'Omit this argument for automatic download of NCEP GFS winds.')
     parser.add_argument('-n', dest='netCDF', 
             help='Export numerical output to NetCDF file')
     parser.add_argument('-f', dest='figure_filename', 
@@ -252,20 +219,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.figure_filename is None and args.netCDF is None:
-        raise ValueError('Not much point in calculating SAR wind '\
-            'if output is not saved as figure or netCDF...' \
-            '\nTa deg en bolle!')
-
-    # Read SAR image
-    sw = SARWind(args.SAR_filename, pixelsize=args.pixelsize)
+        raise ValueError('Please add filename of processed figure (-f) or' \
+                ' netcdf (-n)')
 
     # Get wind direction
     try:
         winddir = int(args.winddir)
     except:
         winddir = args.winddir
-    # Calculate wind
-    sw.calculate_wind(winddir)
+
+    # Read SAR image
+    sw = SARWind(args.SAR_filename, pixelsize=args.pixelsize)
 
     # Save figure
     if args.figure_filename is not None:
@@ -280,4 +244,3 @@ if __name__ == '__main__':
         print 'https://github.com/nansencenter/nansat/issues/47'
         #print 'Saving output to netCDF file: ' + args.netCDF
         #sw.export_wind(args.netCDF)
-
