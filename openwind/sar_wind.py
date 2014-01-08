@@ -86,10 +86,16 @@ class SARWind(Nansat, object):
 
         if not isinstance(self.winddir, int):
             if self.winddir is None:
-                self.modelWind = ModelWind(self.SAR_image_time, domain=self)
+                self.modelWind = ModelWind(self.SAR_image_time)
             else:
-                self.modelWind = ModelWind(wind=self.winddir, domain=self)
+                if isinstance(self.winddir, ModelWind):
+                    self.modelWind = self.winddir
+                else:
+                    self.modelWind = ModelWind(wind=self.winddir)
             winddir_time = self.modelWind.time 
+
+            # Bi-linear interpolation onto SAR image
+            self.modelWind.reproject(self, eResampleAlg=1)
 
             # Check time difference between SAR image and wind direction object
             timediff = self.SAR_image_time - winddir_time

@@ -24,18 +24,19 @@ get_grib = os.path.join(openWindFolder, 'get_grib.pl ')
 
 class ModelWind(Nansat, object):
 
-    def __init__(self, time=None, wind=None, domain=None, *args, **kwargs):
+    def __init__(self, wind=None, time=None, domain=None, *args, **kwargs):
         '''
             Get model wind field, and optionally reproject it to a given
             domain.
 
-            At least 'time' or 'wind' (filename or Nansat object) is required
-            as input. The 'time' input is ignored if both are provided.
+            Either filename or Nansat object, or time and domain is required
+            as input.
             
             Parameters
             -----------
-            time : datetime - the appreciated time of the model wind field
-            wind : string or Nansat
+            wind : string or Nansat object
+            time : datetime
+                the appreciated time of the model wind field
             domain : nansat Domain
         '''
         if not time and not wind:
