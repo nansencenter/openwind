@@ -12,6 +12,7 @@ import numpy as np
 
 try:
     import matplotlib.pyplot as plt
+    from matplotlib.cm import jet
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
@@ -187,7 +188,14 @@ class SARWind(Nansat, object):
                                     winddirReductionFactor))
         Ux = np.sin(np.radians(winddir_relative_up[Y, X]))
         Vx = np.cos(np.radians(winddir_relative_up[Y, X]))
-        plt.imshow(sar_windspeed)
+        palette = jet
+        try:
+            self.add_band(array=self.watermask()[1], parameters={'name': 'watermask'})
+            sar_windspeed = np.ma.masked_where(self['watermask']==2, sar_windspeed)
+            palette.set_bad('k', 1.0)
+        except:
+            pass # Landmask not available
+        plt.imshow(sar_windspeed, cmap=palette)
         plt.clim([0, 18])
         cbar = plt.colorbar()
         plt.quiver(X, Y, Ux, Vx, angles='xy')
