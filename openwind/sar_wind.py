@@ -7,6 +7,7 @@
 #               http://www.gnu.org/licenses/gpl-3.0.html
 
 import argparse
+from datetime import datetime
 
 import numpy as np
 
@@ -83,10 +84,9 @@ class SARWind(Nansat, object):
         # Calculate wind speed from SAR sigma0 in VV polarization
         if winddir:
             self.winddir = winddir
-
         if not isinstance(self.winddir, int):
-            if self.winddir is None:
-                self.modelWind = ModelWind(self.SAR_image_time)
+            if self.winddir is None or self.winddir == 'online':
+                self.modelWind = ModelWind(time=self.SAR_image_time)
             else:
                 if isinstance(self.winddir, ModelWind):
                     self.modelWind = self.winddir
@@ -173,7 +173,7 @@ class SARWind(Nansat, object):
                             'wkv': 'northward_wind',
         })
 
-    def plot(self, numVectorsX = 20, show=True):
+    def plot(self, numVectorsX = 20, show=True, landmask=True, icemask=True):
         ''' Basic plotting function showing CMOD wind speed
         overlaid vectors in SAR image projection'''
 
@@ -194,14 +194,28 @@ class SARWind(Nansat, object):
                                     winddirReductionFactor))
         Ux = np.sin(np.radians(winddir_relative_up[Y, X]))
         Vx = np.cos(np.radians(winddir_relative_up[Y, X]))
+        sar_windspeed[sar_windspeed<0] = 0
         palette = jet
-        try:
-            self.add_band(array=self.watermask()[1], parameters={'name': 'watermask'})
-            sar_windspeed = np.ma.masked_where(self['watermask']==2, sar_windspeed)
-            palette.set_bad('k', 1.0)
-        except:
-            pass # Landmask not available
-        plt.imshow(sar_windspeed, cmap=palette)
+
+        if landmask:
+            try: # Land mask
+                self.add_band(array=self.watermask()[1], parameters={'name': 'watermask'})
+                sar_windspeed = np.ma.masked_where(self['watermask']==2, sar_windspeed)
+                palette.set_bad('k', 1.0) # Land is masked (bad)
+            except:
+                print 'Land mask not available'
+        
+        if icemask:
+            try: # Ice mask
+                ice = Nansat('metno_hires_seaice:' + self.SAR_image_time.strftime('%Y%m%d'))
+                ice.reproject(self)
+                iceMask = ice[1]
+                sar_windspeed[ice['sea_ice_area_fraction']>0] = -1
+                palette.set_under('w', 1.0) # Ice is 'under' (-1)
+            except:
+                print 'Ice mask not available'
+
+        plt.imshow(sar_windspeed, cmap=palette, interpolation='nearest')
         plt.clim([0, 18])
         cbar = plt.colorbar()
         plt.quiver(X, Y, Ux, Vx, angles='xy')
@@ -243,7 +257,7 @@ if __name__ == '__main__':
         winddir = args.winddir
 
     # Read SAR image
-    sw = SARWind(args.SAR_filename, pixelsize=args.pixelsize)
+    sw = SARWind(args.SAR_filename, winddir, pixelsize=args.pixelsize)
 
     # Save figure
     if args.figure_filename is not None:
