@@ -97,7 +97,7 @@ class ModelWind(Nansat, object):
             return True
 
     def download_ncep(self, time, outFolder = ''):
-    
+        print 'Trying to download NCEP GFS model wind...' 
         time = time.replace(tzinfo=None) # Remove timezone information
         # Find closest 6 hourly modelrun and forecast hour
         modelRunHour = round((time.hour + time.minute/60.)/6)*6
@@ -122,7 +122,7 @@ class ModelWind(Nansat, object):
             print 'NCEP wind is already downloaded: ' + outFileName
             return outFileName
         else:
-            os.system('curl -o ' + outFileName + ' ' + url)
+            os.system('curl -so ' + outFileName + ' ' + url)
             if os.path.exists(outFileName):
                 print 'Downloaded ' + outFileName
                 return outFileName

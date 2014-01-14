@@ -132,12 +132,14 @@ class SARWind(Nansat, object):
         # TODO: 
         # - add other CMOD versions than CMOD5
         print 'Calculating SAR wind with CMOD...'
+        startTime = datetime.now()
         if not self.has_band('sar_look_direction'):
             self.set_look_direction()
 
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo], 
                             np.mod(winddirArray - self['sar_look_direction'], 360), 
                             self['incidence_angle'])
+        print 'Calculation time: ' + str(datetime.now() - startTime)
 
         windspeed[np.where(np.isnan(windspeed))] = np.nan
         windspeed[np.where(np.isinf(windspeed))] = np.nan

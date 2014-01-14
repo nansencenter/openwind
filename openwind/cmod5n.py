@@ -1,3 +1,7 @@
+import warnings
+# Ignore overflow errors for wind calculations over land
+warnings.simplefilter("ignore", RuntimeWarning) 
+
 def cmod5n_forward(v,phi,theta):
     '''!     ---------
     !     cmod5n_forward(v, phi, theta)
