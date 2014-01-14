@@ -80,7 +80,7 @@ class SARWind(Nansat, object):
             self.set_look_direction()
         super(SARWind, self).reproject(*args, **kwargs)
 
-    def calculate_wind(self, winddir=None, storeModelSpeed=False):
+    def calculate_wind(self, winddir=None, storeModelSpeed=True):
         # Calculate wind speed from SAR sigma0 in VV polarization
         if winddir:
             self.winddir = winddir
@@ -126,6 +126,7 @@ class SARWind(Nansat, object):
                     ' degrees clockwise from North'
             winddirArray = np.ones(self.shape())*self.winddir
             winddir_time = None
+            storeModelSpeed = False # No windsped available, if direction given as number
 
         # Calculate SAR wind with CMOD
         # TODO: 
@@ -188,12 +189,17 @@ class SARWind(Nansat, object):
         # model_winddir is direction from which wind is blowing
         winddir_relative_up = 360 - self['winddirection'] + \
                                     self.azimuth_up()
-        X, Y = np.meshgrid(range(0, self.vrt.dataset.RasterXSize, 
-                                    winddirReductionFactor),
-                           range(0, self.vrt.dataset.RasterYSize, 
-                                    winddirReductionFactor))
-        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))
-        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))
+        indX = range(0, self.vrt.dataset.RasterXSize, winddirReductionFactor)
+        indY = range(0, self.vrt.dataset.RasterYSize, winddirReductionFactor)
+        X, Y = np.meshgrid(indX, indY)
+        try: # scaling of wind vector length, if model wind is available
+            model_windspeed = self['model_windspeed']
+            model_windspeed = model_windspeed[Y, X]
+        except:
+            model_windspeed = np.ones(X.shape)
+
+        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*model_windspeed
+        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*model_windspeed
         sar_windspeed[sar_windspeed<0] = 0
         palette = jet
 
@@ -218,7 +224,7 @@ class SARWind(Nansat, object):
         plt.imshow(sar_windspeed, cmap=palette, interpolation='nearest')
         plt.clim([0, 18])
         cbar = plt.colorbar()
-        plt.quiver(X, Y, Ux, Vx, angles='xy')
+        plt.quiver(X, Y, Ux, Vx, angles='xy', color=[.2, .2, .2], headaxislength=4)
         plt.axis('off')
         if show:
             plt.show()

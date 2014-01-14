@@ -10,10 +10,10 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 # Command line usage:
 
 ```
-./sar_wind.py -s SAR_image -w winddir -f figure_filename -n netCDF_filename -p pixelsize
+./sar_wind.py -s SAR_filename -w winddir -f figure_filename -n netCDF_filename -p pixelsize
 ```
 
-- SAR_image is a file readable by Nansat, containing NRCS in VV polarisation
+- SAR_filename is a file readable by Nansat, containing Normalised Radar Cross Section (NRCS)
 
 - winddir is either:
   - a file readable by Nansat, containing wind direction (U10 and V10)
@@ -33,7 +33,7 @@ To see explanation of all features:
 ```
 >>> from openwind import SARwind
 
->>> s = SARwind(SAR_image, winddir, pixelsize)
+>>> s = SARwind(SAR_filename, winddir, pixelsize)
 ```
 
 See above (command line usage) for specification of the input parameters.
@@ -50,7 +50,7 @@ If winddir is not specified when the SARWind object is generated with the Python
 ```
 >>> from openwind import SARWind
 
->>> s = SARwind(SAR_image)
+>>> s = SARwind(SAR_filename)
 
 >>> s.crop(lonlim=[5, 6], latlim=[60, 61])
 
