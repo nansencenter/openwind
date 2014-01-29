@@ -207,18 +207,27 @@ class SARWind(Nansat, object):
 
         if landmask:
             try: # Land mask
-                self.add_band(array=self.watermask()[1], parameters={'name': 'watermask'})
-                sar_windspeed = np.ma.masked_where(self['watermask']==2, sar_windspeed)
+                self.add_band(array=self.watermask()[1], 
+                            parameters={'name': 'watermask'})
+                sar_windspeed = np.ma.masked_where(
+                                    self['watermask']==2, sar_windspeed)
                 palette.set_bad('k', 1.0) # Land is masked (bad)
             except:
                 print 'Land mask not available'
         
         if icemask:
             try: # Ice mask
-                ice = Nansat('metno_hires_seaice:' + self.SAR_image_time.strftime('%Y%m%d'))
+                try: # first try local file 
+                    ice = Nansat('metno_local_hires_seaice_' + 
+                            self.SAR_image_time.strftime('%Y%m%d'), 
+                            mapperName='metno_local_hires_seaice')
+                except: # otherwise Thredds
+                    ice = Nansat('metno_hires_seaice:' + 
+                            self.SAR_image_time.strftime('%Y%m%d'))
                 ice.reproject(self)
-                iceMask = ice[1]
-                sar_windspeed[ice['sea_ice_area_fraction']>0] = -1
+                iceBandNo = ice._get_band_number(
+                    {'standard_name': 'sea_ice_area_fraction'})
+                sar_windspeed[ice[iceBandNo]>0] = -1
                 palette.set_under('w', 1.0) # Ice is 'under' (-1)
             except:
                 print 'Ice mask not available'
@@ -226,7 +235,8 @@ class SARWind(Nansat, object):
         plt.imshow(sar_windspeed, cmap=palette, interpolation='nearest')
         plt.clim([0, 18])
         cbar = plt.colorbar()
-        plt.quiver(X, Y, Ux, Vx, angles='xy', color=[.2, .2, .2], headaxislength=4)
+        plt.quiver(X, Y, Ux, Vx, angles='xy', 
+                    color=[.2, .2, .2], headaxislength=4)
         plt.axis('off')
         if show:
             plt.show()
