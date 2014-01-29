@@ -17,7 +17,7 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
-from nansat import Nansat
+from nansat import Nansat, Domain
 from model_wind import ModelWind
 from cmod5n import cmod5n_inverse
 
@@ -176,41 +176,21 @@ class SARWind(Nansat, object):
                             'wkv': 'northward_wind',
         })
 
-    def plot(self, numVectorsX = 20, show=True, landmask=True, icemask=True):
-        ''' Basic plotting function showing CMOD wind speed
-        overlaid vectors in SAR image projection'''
 
+    def _get_masked_windspeed(self, landmask=True, icemask=True):
         try:
             sar_windspeed = self['windspeed']
         except:
             raise ValueError('SAR wind has not been calculated, ' \
-                'execute calculate_wind(winddir) before plotting.')
+                'execute calculate_wind(winddir) first.')
 
-        winddirReductionFactor = np.round(
-                self.vrt.dataset.RasterXSize/numVectorsX)
-        # model_winddir is direction from which wind is blowing
-        winddir_relative_up = 360 - self['winddirection'] + \
-                                    self.azimuth_up()
-        indX = range(0, self.vrt.dataset.RasterXSize, winddirReductionFactor)
-        indY = range(0, self.vrt.dataset.RasterYSize, winddirReductionFactor)
-        X, Y = np.meshgrid(indX, indY)
-        try: # scaling of wind vector length, if model wind is available
-            model_windspeed = self['model_windspeed']
-            model_windspeed = model_windspeed[Y, X]
-        except:
-            model_windspeed = np.ones(X.shape)
-
-        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*model_windspeed
-        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*model_windspeed
         sar_windspeed[sar_windspeed<0] = 0
         palette = jet
 
         if landmask:
             try: # Land mask
-                self.add_band(array=self.watermask()[1], 
-                            parameters={'name': 'watermask'})
                 sar_windspeed = np.ma.masked_where(
-                                    self['watermask']==2, sar_windspeed)
+                                    self.watermask()[1]==2, sar_windspeed)
                 palette.set_bad('k', 1.0) # Land is masked (bad)
             except:
                 print 'Land mask not available'
@@ -232,6 +212,47 @@ class SARWind(Nansat, object):
             except:
                 print 'Ice mask not available'
 
+        return sar_windspeed, palette
+
+    def write_geotiff(self, filename, landmask=True, icemask=True):
+
+        sar_windspeed, palette = self._get_masked_windspeed(landmask, icemask)
+
+        nansat_geotiff = Nansat(array=sar_windspeed, domain=self,
+                                parameters = {'name': 'masked_windspeed',
+                                              'minmax': '0 18'})
+                        
+        nansat_geotiff.write_geotiffimage(filename)
+
+
+    def plot(self, numVectorsX = 20, show=True, landmask=True, icemask=True):
+        ''' Basic plotting function showing CMOD wind speed
+        overlaid vectors in SAR image projection'''
+
+        try:
+            sar_windspeed, palette = self._get_masked_windspeed(landmask, icemask)
+        except:
+            raise ValueError('SAR wind has not been calculated, ' \
+                'execute calculate_wind(winddir) before plotting.')
+
+        winddirReductionFactor = np.round(
+                self.vrt.dataset.RasterXSize/numVectorsX)
+        # model_winddir is direction from which wind is blowing
+        winddir_relative_up = 360 - self['winddirection'] + \
+                                    self.azimuth_up()
+        indX = range(0, self.vrt.dataset.RasterXSize, winddirReductionFactor)
+        indY = range(0, self.vrt.dataset.RasterYSize, winddirReductionFactor)
+        X, Y = np.meshgrid(indX, indY)
+        try: # scaling of wind vector length, if model wind is available
+            model_windspeed = self['model_windspeed']
+            model_windspeed = model_windspeed[Y, X]
+        except:
+            model_windspeed = np.ones(X.shape)
+
+        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*model_windspeed
+        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*model_windspeed
+
+        # Plotting
         plt.imshow(sar_windspeed, cmap=palette, interpolation='nearest')
         plt.clim([0, 18])
         cbar = plt.colorbar()
