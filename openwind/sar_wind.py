@@ -32,7 +32,7 @@ class SARWind(Nansat, object):
         '''
             Parameters
             -----------
-            sar_image : string 
+            sar_image : string
                         The SAR image filename - should be the original file.
             winddir :   int, string, Nansat, None
                         Auxiliary wind field information needed to calculate
@@ -45,18 +45,18 @@ class SARWind(Nansat, object):
                     ' disabled in the master branch.')
             #warnings.warn('Using Nansat object to calculate wind. Note that' \
             #        ' any previous reprojection is repeated to' \
-            #        ' maintain correct azimuth.') 
+            #        ' maintain correct azimuth.')
             #super(SARWind, self).__init__(sar_image.fileName)
             #self.reproject(sar_image)
 
         # Check that this is a SAR image with VV pol NRCS
         try:
             self.sigma0_bandNo = self._get_band_number(
-                            {'standard_name': 
-            'surface_backwards_scattering_coefficient_of_radar_wave', 
+                            {'standard_name':
+            'surface_backwards_scattering_coefficient_of_radar_wave',
                             'polarization': 'VV'})
         except:
-            raise TypeError(self.fileName + 
+            raise TypeError(self.fileName +
                 ' does not have SAR NRCS in VV polarization')
 
         self.SAR_image_time = self.get_time(
@@ -103,7 +103,7 @@ class SARWind(Nansat, object):
         '''
 
         # TODO:
-        # - if several instances, 
+        # - if several instances,
         #       choose the one closest in time to SAR image
         # - should check if wind object really covers SAR image
         # - check that surface (10 m) winds are chosen
@@ -139,7 +139,7 @@ class SARWind(Nansat, object):
 
         if not isinstance(self.winddir, int):
             aux = self.get_auxiliary()
-            winddir_time = aux.time 
+            winddir_time = aux.time
 
             # Check time difference between SAR image and wind direction object
             timediff = self.SAR_image_time - winddir_time
@@ -172,14 +172,14 @@ class SARWind(Nansat, object):
             winddir_time = None
 
         # Calculate SAR wind with CMOD
-        # TODO: 
+        # TODO:
         # - add other CMOD versions than CMOD5
         print 'Calculating SAR wind with CMOD...'
         if not self.has_band('sar_look_direction'):
             self.set_look_direction()
 
-        windspeed = cmod5n_inverse(self[self.sigma0_bandNo], 
-                            np.mod(winddirArray - self['sar_look_direction'], 360), 
+        windspeed = cmod5n_inverse(self[self.sigma0_bandNo],
+                            np.mod(winddirArray - self['sar_look_direction'], 360),
                             self['incidence_angle'])
 
         windspeed[np.where(np.isnan(windspeed))] = np.nan
@@ -217,9 +217,22 @@ class SARWind(Nansat, object):
                             'wkv': 'northward_wind',
         })
 
-    def plot(self, numVectorsX = 20, show=True):
+    def plot(self, numVectorsX = 20, show=True, clim=[3,10], scale=None):
         ''' Basic plotting function showing CMOD wind speed
-        overlaid vectors in SAR image projection'''
+        overlaid vectors in SAR image projection
+
+        parameters
+        ----------
+        clim : list
+            Color limits of the image.
+        scale : None or float
+            Data units per arrow length unit, e.g., m/s per plot width;
+            a smaller scale parameter makes the arrow longer.
+            If None, a simple autoscaling algorithm is used,
+            based on the average vector length and the number of vectors.
+            The arrow length unit is given by the scale_units parameter.
+
+        '''
 
         try:
             sar_windspeed = self['windspeed']
@@ -232,21 +245,21 @@ class SARWind(Nansat, object):
         # model_winddir is direction from which wind is blowing
         winddir_relative_up = 360 - self['winddirection'] + \
                                     self.azimuth_up()
-        X, Y = np.meshgrid(range(0, self.vrt.dataset.RasterXSize, 
+        X, Y = np.meshgrid(range(0, self.vrt.dataset.RasterXSize,
                                     winddirReductionFactor),
-                           range(0, self.vrt.dataset.RasterYSize, 
+                           range(0, self.vrt.dataset.RasterYSize,
                                     winddirReductionFactor))
-        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))
-        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))
+
+        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*20
+        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*20
         plt.imshow(sar_windspeed)
-        plt.clim([3, 10])
+        plt.clim(clim)
         cbar = plt.colorbar()
-        plt.quiver(X, Y, Ux, Vx, angles='xy')
+        plt.quiver(X, Y, Ux, Vx, angles='xy', scale = scale)
         plt.axis('off')
         if show:
             plt.show()
         return plt
-
 
 
 ###################################
@@ -255,18 +268,18 @@ class SARWind(Nansat, object):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', dest='SAR_filename', 
+    parser.add_argument('-s', dest='SAR_filename',
             required=True, help='SAR image filename')
-    parser.add_argument('-w', dest='winddir', 
+    parser.add_argument('-w', dest='winddir',
             default='online', help='Wind direction filename or constant '
                 ' (integer, 0 for wind from North, 90 for wind from East etc.). '
                 'Omit this argument for automatic download of NCEP GFS winds.')
-    parser.add_argument('-n', dest='netCDF', 
+    parser.add_argument('-n', dest='netCDF',
             help='Export numerical output to NetCDF file')
-    parser.add_argument('-f', dest='figure_filename', 
+    parser.add_argument('-f', dest='figure_filename',
             help='Save wind plot as figure (e.g. PNG or JPEG)')
-    parser.add_argument('-p', dest='pixelsize', default=500, 
-            help='Pixel size for SAR wind calculation (default = 500 m)', 
+    parser.add_argument('-p', dest='pixelsize', default=500,
+            help='Pixel size for SAR wind calculation (default = 500 m)',
                 type=float)
     args = parser.parse_args()
 
