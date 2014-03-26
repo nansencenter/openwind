@@ -261,6 +261,16 @@ class SARWind(Nansat, object):
             plt.show()
         return plt
 
+    def save_wind_map_image(self, fileName, scale=None, landmask=True):
+        nMap = Nansatmap(self, resolution='l')
+        nMap.pcolormesh(self['windspeed'])
+
+        winddirection = self['winddirection']
+        Ux = np.sin(np.radians(winddirection))
+        Vx = np.cos(np.radians(winddirection))
+        nMap.quiver(Ux, Vx, scale=scale)
+
+        nMap.save(fileName, landmask=landmask)
 
 ###################################
 #    If run from command line
