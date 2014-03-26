@@ -113,7 +113,7 @@ class SARWind(Nansat, object):
         if not self.winddir:
             mw = ModelWind(self.SAR_image_time, domain=self)
         else:
-            mw = ModelWind(self.winddir, domain=self)
+            mw = ModelWind(wind=self.winddir, domain=self)
 
         return mw
 
