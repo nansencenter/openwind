@@ -17,7 +17,7 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
-from nansat import Nansat
+from nansat import Nansat, Nansatmap
 from model_wind import ModelWind
 from cmod5n import cmod5n_inverse
 
@@ -264,7 +264,9 @@ class SARWind(Nansat, object):
 
     def save_wind_map_image(self, fileName, scale=None, landmask=True):
         nMap = Nansatmap(self, resolution='l')
-        nMap.pcolormesh(self['windspeed'])
+        nMap.pcolormesh(self['windspeed'],[3,15])
+        nMap.add_colorbar(fontsize=10)
+        nMap.drawgrid()
 
         # use wind direction "to" for calculating u and v
         winddirection = np.mod(self['winddirection']+180,360) 
