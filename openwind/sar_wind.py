@@ -162,8 +162,9 @@ class SARWind(Nansat, object):
             # Get wind direction
             u_array = aux[wind_u_bandNo]
             v_array = aux[wind_v_bandNo]
+            # 0 degrees meaning wind from North, 90 degrees meaning wind from East
             winddirArray = np.degrees(
-                    np.arctan2(-u_array, -v_array)) # 0 from North, 90 from East
+                    np.arctan2(-u_array, -v_array)) 
         else:
             # Constant wind direction is input
             print 'Using constant wind (from) direction: ' + str(self.winddir) + \
@@ -265,7 +266,8 @@ class SARWind(Nansat, object):
         nMap = Nansatmap(self, resolution='l')
         nMap.pcolormesh(self['windspeed'])
 
-        winddirection = self['winddirection']
+        # use wind direction "to" for calculating u and v
+        winddirection = np.mod(self['winddirection']+180,360) 
         Ux = np.sin(np.radians(winddirection))
         Vx = np.cos(np.radians(winddirection))
         nMap.quiver(Ux, Vx, scale=scale)
