@@ -275,17 +275,10 @@ class SARWind(Nansat, object):
         Vgeo = np.cos(np.radians(self[winddirBand]+180)) # add 180 deg to get "to"-direction
         Ugeo = np.sin(np.radians(self[winddirBand]+180))
 
-        if self.get_metadata()['ORBIT_DIRECTION'].lower()=='descending':
-            # Descending pass transformation of the wind directions
-            Usat = ( Vgeo*np.sin(np.radians(self.azimuth_up())) -
+        # Transformation of the wind directions
+        Usat = ( Vgeo*np.sin(np.radians(self.azimuth_up())) -
                     Ugeo*np.cos(np.radians(self.azimuth_up())) )
-            Vsat = -( Vgeo*np.cos(np.radians(self.azimuth_up())) +
-                    Ugeo*np.sin(np.radians(self.azimuth_up())) )
-        else:
-            # Ascending pass transformation of the wind directions
-            Usat = ( Vgeo*np.sin(np.radians(self.azimuth_up())) -
-                    Ugeo*np.cos(np.radians(self.azimuth_up())) )
-            Vsat = -( Vgeo*np.cos(np.radians(self.azimuth_up())) +
+        Vsat = -( Vgeo*np.cos(np.radians(self.azimuth_up())) +
                     Ugeo*np.sin(np.radians(self.azimuth_up())) )
 
         # Flip images if wanted
