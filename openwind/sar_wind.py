@@ -83,7 +83,7 @@ class SARWind(Nansat, object):
         # previously exported nansat data... Needs fix
         # This function should be replaced by a band added by the SAR mappers -
         # see https://github.com/nansencenter/nansat/issues/57
-        warnings.warn('Function set_sensor_azimuth only works for unprojected' \
+        warnings.warn('Function set_look_direction only works for unprojected' \
                 ' data. It will work if the input SAR image points to the' \
                 ' original source, but not if it is an exported netcdf.')
         if self.get_metadata()['ANTENNA_POINTING'] == 'RIGHT':
