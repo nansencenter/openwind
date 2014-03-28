@@ -34,7 +34,14 @@ class SARWind(Nansat, object):
             -----------
             sar_image : string
                         The SAR image filename - should be the original file.
-            winddir :   int, string, Nansat, None
+            winddir :   int/float (an arbitratry wind direction), 
+                        numpy array (an array of wind directions, same size as
+                        the SAR data), 
+                        string (the name of a file with wind field information
+                            which can be opened by nansat),
+                        Nansat (a Nansat object with wind direction), 
+                        None
+
                         Auxiliary wind field information needed to calculate
                         SAR wind (must be or have wind direction)
         '''
@@ -111,7 +118,11 @@ class SARWind(Nansat, object):
         #       and not the U and V components
 
         if not self.winddir:
-            mw = ModelWind(self.SAR_image_time, domain=self)
+            try:
+                mw = ModelWind(self.SAR_image_time, domain=self)
+            except ValueError as e:
+                warnings.warn(e.message)
+                return None
         else:
             mw = ModelWind(wind=self.winddir, domain=self)
 
@@ -123,10 +134,18 @@ class SARWind(Nansat, object):
 
             Parameters
             -----------
-            winddir :   int, string, Nansat, None
+            winddir :   int/float (an arbitratry wind direction), 
+                        numpy array (an array of wind directions, same size as
+                        the SAR data), 
+                        string (the name of a file with wind field information
+                            which can be opened by nansat),
+                        Nansat (a Nansat object with wind direction), 
+                        None
+
                         Auxiliary wind field information needed to calculate
                         SAR wind (must be or have wind direction)
         '''
+        # check input type
         self.winddir=winddir
 
     def calculate_wind(self, winddir=None, storeModelSpeed=False):
@@ -134,11 +153,15 @@ class SARWind(Nansat, object):
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
 
-        if winddir:
+        if winddir!=None:
             self.set_auxiliary(winddir)
 
-        if not isinstance(self.winddir, int):
+        if not isinstance(self.winddir, int) and not isinstance(self.winddir,
+                float) and not isinstance(self.winddir, np.ndarray):
             aux = self.get_auxiliary()
+            if not aux:
+                print 'Did not calculate wind speeds'
+                return None
             winddir_time = aux.time
 
             # Check time difference between SAR image and wind direction object
@@ -169,7 +192,10 @@ class SARWind(Nansat, object):
             # Constant wind direction is input
             print 'Using constant wind (from) direction: ' + str(self.winddir) + \
                     ' degrees clockwise from North'
-            winddirArray = np.ones(self.shape())*self.winddir
+            if not np.shape(self.winddir):
+                winddirArray = np.ones(self.shape())*self.winddir
+            else:
+                winddirArray = self.winddir
             winddir_time = None
 
         # Calculate SAR wind with CMOD
@@ -218,7 +244,9 @@ class SARWind(Nansat, object):
                             'wkv': 'northward_wind',
         })
 
-    def plot(self, numVectorsX = 20, show=True, clim=[3,10], scale=None):
+    def plot(self, numVectorsX = 20, show=True, clim=[3,10], scale=None,
+            windspeedBand='windspeed', winddirBand='winddirection',
+            northUp_eastRight=True):
         ''' Basic plotting function showing CMOD wind speed
         overlaid vectors in SAR image projection
 
@@ -236,23 +264,48 @@ class SARWind(Nansat, object):
         '''
 
         try:
-            sar_windspeed = self['windspeed']
+            sar_windspeed = self[windspeedBand]
         except:
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(winddir) before plotting.')
 
         winddirReductionFactor = np.round(
                 self.vrt.dataset.RasterXSize/numVectorsX)
-        # model_winddir is direction from which wind is blowing
-        winddir_relative_up = 360 - self['winddirection'] + \
-                                    self.azimuth_up()
+
+        Vgeo = np.cos(np.radians(self[winddirBand]+180)) # add 180 deg to get "to"-direction
+        Ugeo = np.sin(np.radians(self[winddirBand]+180))
+
+        if self.get_metadata()['ORBIT_DIRECTION'].lower()=='descending':
+            # Descending pass transformation of the wind directions
+            Usat = ( Vgeo*np.sin(np.radians(self.azimuth_up())) -
+                    Ugeo*np.cos(np.radians(self.azimuth_up())) )
+            Vsat = -( Vgeo*np.cos(np.radians(self.azimuth_up())) +
+                    Ugeo*np.sin(np.radians(self.azimuth_up())) )
+        else:
+            # Ascending pass transformation of the wind directions
+            Usat = ( Vgeo*np.sin(np.radians(self.azimuth_up())) -
+                    Ugeo*np.cos(np.radians(self.azimuth_up())) )
+            Vsat = -( Vgeo*np.cos(np.radians(self.azimuth_up())) +
+                    Ugeo*np.sin(np.radians(self.azimuth_up())) )
+
+        # Flip images if wanted
+        if northUp_eastRight:
+            if self.get_metadata()['ORBIT_DIRECTION'].lower()=='descending':
+                sar_windspeed = np.fliplr(sar_windspeed)
+                Usat = -np.fliplr(Usat)
+                Vsat = np.fliplr(Vsat)
+            else:
+                sar_windspeed = np.flipud(sar_windspeed)
+                Usat = np.flipud(Usat)
+                Vsat = -np.flipud(Vsat)
+
         X, Y = np.meshgrid(range(0, self.vrt.dataset.RasterXSize,
                                     winddirReductionFactor),
                            range(0, self.vrt.dataset.RasterYSize,
                                     winddirReductionFactor))
 
-        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*20
-        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*20
+        Ux = Usat[Y, X]*10
+        Vx = Vsat[Y, X]*10
         plt.imshow(sar_windspeed)
         plt.clim(clim)
         cbar = plt.colorbar()
@@ -262,14 +315,15 @@ class SARWind(Nansat, object):
             plt.show()
         return plt
 
-    def save_wind_map_image(self, fileName, scale=None, landmask=True):
+    def save_wind_map_image(self, fileName, scale=None, landmask=True,
+            windspeedBand='windspeed', winddirBand='winddirection'):
         nMap = Nansatmap(self, resolution='l')
-        nMap.pcolormesh(self['windspeed'],[3,15])
+        nMap.pcolormesh(self[windspeedBand],[3,15])
         nMap.add_colorbar(fontsize=10)
         nMap.drawgrid()
 
         # use wind direction "to" for calculating u and v
-        winddirection = np.mod(self['winddirection']+180,360) 
+        winddirection = np.mod(self[winddirBand]+180,360) 
         Ux = np.sin(np.radians(winddirection))
         Vx = np.cos(np.radians(winddirection))
         nMap.quiver(Ux, Vx, scale=scale)
