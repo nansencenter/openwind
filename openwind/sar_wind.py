@@ -314,20 +314,74 @@ class SARWind(Nansat, object):
             plt.show()
         return plt
 
-    def save_wind_map_image(self, fileName, scale=None, landmask=True,
-            windspeedBand='windspeed', winddirBand='winddirection'):
-        nMap = Nansatmap(self, resolution='l')
-        nMap.pcolormesh(self[windspeedBand],[3,15])
-        nMap.add_colorbar(fontsize=10)
-        nMap.drawgrid()
+    def save_wind_map_image(self, fileName, scale=None, quiSpace=80,
+                            landmask=True,
+                            colorbar=True, fontsize=6, clim=None,
+                            drawgrid=True, tight=True, title=None, **kwargs):
+
+        nMap = Nansatmap(self, resolution='l',figsize=(5, 8))
 
         # use wind direction "to" for calculating u and v
-        winddirection = np.mod(self[winddirBand]+180,360)
-        Ux = np.sin(np.radians(winddirection))
-        Vx = np.cos(np.radians(winddirection))
-        nMap.quiver(Ux, Vx, scale=scale)
+        winddirection = np.mod(self['winddirection'] + 180, 360)
+        windspeed = self['windspeed']
 
-        nMap.save(fileName, landmask=landmask)
+        windspeedPcolor = np.copy(windspeed)
+        # Replace the edge color (dark blue) to white
+        windspeedPcolor[windspeedPcolor == 0.0390625] = np.NaN
+        # Put colormesh
+        nMap.pcolormesh(windspeedPcolor)
+
+        # apply landmask to windspeeds
+        windspeed = np.ma.masked_where(
+                                    self.watermask()[1]==2, windspeed)
+
+        # specify the scale of length of arrows
+        X, Y = np.meshgrid(range(0, windspeed.shape[1], quiSpace),
+                           range(0, windspeed.shape[0], quiSpace))
+
+        meshWindspeed = windspeed[Y, X].flatten()
+        meshWindspeed = meshWindspeed[meshWindspeed.mask == False]
+        if type(meshWindspeed) == np.float64:
+            maxSpeed = meshWindspeed
+        else:
+            maxSpeed = max(meshWindspeed)
+
+        if scale is None and maxSpeed <= 10.0:
+            scale = 200
+        elif scale is None:
+            scale = 300
+
+        # specify the number of quiver
+        numQuiX = int(self.vrt.dataset.RasterXSize / quiSpace)
+        numQuiY = int(self.vrt.dataset.RasterYSize / quiSpace)
+
+        # if windspeed is not computed, set 10.0 to all values
+        #seawindspeed = windspeed[[windspeed.mask == False]].flatten()
+        #if min(seawindspeed) == max(seawindspeed):
+        #    windspeed[[windspeed.mask == False]] = 10.0
+
+        # Draw quivers
+        Ux = np.sin(np.radians(winddirection)) * windspeed
+        Vx = np.cos(np.radians(winddirection)) * windspeed
+        nMap.quiver(Ux, Vx, scale=scale,
+                    quivectors=(numQuiY, numQuiX),
+                    width=0.002, X=0.8, Y=0.1, U=10, label='10 m/sec',
+                    fontproperties={'size':8})
+
+        if colorbar:
+            nMap.add_colorbar(fontsize=fontsize, clim=clim)
+
+        if drawgrid:
+            nMap.drawgrid()
+
+        if title is not None:
+            plt.title(title, fontsize=10)
+
+        if tight:
+            nMap.fig.tight_layout()
+
+        nMap.save(fileName, landmask=landmask, **kwargs)
+
 
 ###################################
 #    If run from command line
