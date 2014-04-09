@@ -34,12 +34,12 @@ class SARWind(Nansat, object):
             -----------
             sar_image : string
                         The SAR image filename - should be the original file.
-            winddir :   int/float (an arbitratry wind direction), 
+            winddir :   int/float (an arbitratry wind direction),
                         numpy array (an array of wind directions, same size as
-                        the SAR data), 
+                        the SAR data),
                         string (the name of a file with wind field information
                             which can be opened by nansat),
-                        Nansat (a Nansat object with wind direction), 
+                        Nansat (a Nansat object with wind direction),
                         None
 
                         Auxiliary wind field information needed to calculate
@@ -134,12 +134,12 @@ class SARWind(Nansat, object):
 
             Parameters
             -----------
-            winddir :   int/float (an arbitratry wind direction), 
+            winddir :   int/float (an arbitratry wind direction),
                         numpy array (an array of wind directions, same size as
-                        the SAR data), 
+                        the SAR data),
                         string (the name of a file with wind field information
                             which can be opened by nansat),
-                        Nansat (a Nansat object with wind direction), 
+                        Nansat (a Nansat object with wind direction),
                         None
 
                         Auxiliary wind field information needed to calculate
@@ -166,7 +166,13 @@ class SARWind(Nansat, object):
 
             # Check time difference between SAR image and wind direction object
             timediff = self.SAR_image_time - winddir_time
-            hoursDiff = np.abs(timediff.total_seconds()/3600.)
+            try:
+                secondsDiff = timediff.total_seconds()
+            except: # for < python2.7
+                secondsDiff = (timediff.microseconds +
+                               (timediff.seconds + timediff.days *
+                                24 * 3600) * 10**6) / 10**6
+            hoursDiff = np.abs(secondsDiff/3600.)
             print 'Time difference between SAR image and wind direction: ' \
                     + '%.2f' % hoursDiff + ' hours'
             print 'SAR image time: ' + str(self.SAR_image_time)
@@ -187,7 +193,7 @@ class SARWind(Nansat, object):
             v_array = aux[wind_v_bandNo]
             # 0 degrees meaning wind from North, 90 degrees meaning wind from East
             winddirArray = np.degrees(
-                    np.arctan2(-u_array, -v_array)) 
+                    np.arctan2(-u_array, -v_array))
         else:
             # Constant wind direction is input
             print 'Using constant wind (from) direction: ' + str(self.winddir) + \
@@ -316,7 +322,7 @@ class SARWind(Nansat, object):
         nMap.drawgrid()
 
         # use wind direction "to" for calculating u and v
-        winddirection = np.mod(self[winddirBand]+180,360) 
+        winddirection = np.mod(self[winddirBand]+180,360)
         Ux = np.sin(np.radians(winddirection))
         Vx = np.cos(np.radians(winddirection))
         nMap.quiver(Ux, Vx, scale=scale)
