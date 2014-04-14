@@ -28,7 +28,7 @@ class SARWind(Nansat, object):
     A class for calculating wind speed from SAR images using CMOD
     '''
 
-    def __init__(self, sar_image, winddir=None, pixelsize=500):
+    def __init__(self, sar_image, winddir=None, pixelsize=500, eResampleAlg=1):
         '''
             Parameters
             -----------
@@ -74,7 +74,7 @@ class SARWind(Nansat, object):
             self.resize(pixelsize=pixelsize)
 
         self.set_auxiliary(winddir)
-        self.calculate_wind()
+        self.calculate_wind(eResampleAlg=eResampleAlg)
 
     def set_look_direction(self):
         # OBS - this will only work on unprojected data.
@@ -103,7 +103,7 @@ class SARWind(Nansat, object):
             self.set_look_direction()
         super(SARWind, self).reproject(*args, **kwargs)
 
-    def get_auxiliary(self):
+    def get_auxiliary(self, eResampleAlg=1):
         '''
             Get auxiliary information (Nansat object with wind direction)
             needed to estimate wind speed from SAR
@@ -119,12 +119,14 @@ class SARWind(Nansat, object):
 
         if not self.winddir:
             try:
-                mw = ModelWind(self.SAR_image_time, domain=self)
+                mw = ModelWind(self.SAR_image_time, domain=self,
+                               eResampleAlg=eResampleAlg)
             except ValueError as e:
                 warnings.warn(e.message)
                 return None
         else:
-            mw = ModelWind(wind=self.winddir, domain=self)
+            mw = ModelWind(wind=self.winddir, domain=self,
+                           eResampleAlg=eResampleAlg)
 
         return mw
 
@@ -148,7 +150,8 @@ class SARWind(Nansat, object):
         # check input type
         self.winddir=winddir
 
-    def calculate_wind(self, winddir=None, storeModelSpeed=False):
+    def calculate_wind(self, winddir=None, storeModelSpeed=False,
+                       eResampleAlg=1):
         '''
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
@@ -158,7 +161,7 @@ class SARWind(Nansat, object):
 
         if not isinstance(self.winddir, int) and not isinstance(self.winddir,
                 float) and not isinstance(self.winddir, np.ndarray):
-            aux = self.get_auxiliary()
+            aux = self.get_auxiliary(eResampleAlg=eResampleAlg)
             if not aux:
                 print 'Did not calculate wind speeds'
                 return None

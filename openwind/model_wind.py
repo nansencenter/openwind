@@ -24,13 +24,14 @@ get_grib = os.path.join(openWindFolder, 'get_grib.pl ')
 
 class ModelWind(Nansat, object):
 
-    def __init__(self, time=None, wind=None, domain=None, *args, **kwargs):
+    def __init__(self, time=None, wind=None, domain=None, eResampleAlg=1, *args, **kwargs):
         '''
             Get model wind field, and optionally reproject it to a given
             domain.
 
             At least 'time' or 'wind' (filename or Nansat object) is required
             as input. The 'time' input is ignored if both are provided.
+
 
             Parameters
             -----------
@@ -74,7 +75,7 @@ class ModelWind(Nansat, object):
 
         if domain:
             # Bi-linear interpolation onto given domain
-            self.reproject(domain, eResampleAlg=1)
+            self.reproject(domain, eResampleAlg=eResampleAlg)
 
     def __del__(self):
         if self.downloaded and os.path.exists(self.downloaded):
