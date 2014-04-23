@@ -248,9 +248,11 @@ class SARWind(Nansat, object):
         v = windspeed*np.cos((180.0 - winddirArray)*np.pi/180.0)
         self.add_band(array=u, parameters={
                             'wkv': 'eastward_wind',
+                            'time': winddir_time,
         })
         self.add_band(array=v, parameters={
                             'wkv': 'northward_wind',
+                            'time': winddir_time,
         })
 
     def plot(self, numVectorsX = 20, show=True, clim=[3,10], scale=None,
