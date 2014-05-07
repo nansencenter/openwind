@@ -60,25 +60,6 @@ class SARWind(Nansat, object):
         if winddir is not None:
             self.calculate_wind()
 
-    def set_look_direction(self):
-        # This function should be replaced by a band added by the SAR mappers -
-        # see https://github.com/nansencenter/nansat/issues/57
-        if self.get_metadata()['ANTENNA_POINTING'] == 'RIGHT':
-            look_direction = self.azimuth_up() + 90
-        else:
-            look_direction = self.azimuth_up() - 90
-        self.add_band(array=look_direction, parameters={
-                        'name': 'sar_look_direction',
-                        'time': self.get_time(self.sigma0_bandNo),
-                })
-
-    def reproject(self, *args, **kwargs):
-        # Overloading Nansat.reproject()
-        # Calculate SAR look direction before reprojection, and store as
-        # NumPy band to avoid problems due to modified domain orientation
-        if not self.has_band('sar_look_direction'):
-            self.set_look_direction()
-        super(SARWind, self).reproject(*args, **kwargs)
 
     def calculate_wind(self, winddir=None, storeModelSpeed=True):
         # Calculate wind speed from SAR sigma0 in VV polarization
@@ -133,12 +114,10 @@ class SARWind(Nansat, object):
         # - add other CMOD versions than CMOD5
         print 'Calculating SAR wind with CMOD...'
         startTime = datetime.now()
-        if not self.has_band('sar_look_direction'):
-            self.set_look_direction()
 
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo], 
-                            np.mod(winddirArray - self['sar_look_direction'], 360), 
-                            self['incidence_angle'])
+                        np.mod(winddirArray - self['SAR_look_direction'], 360), 
+                        self['incidence_angle'])
         print 'Calculation time: ' + str(datetime.now() - startTime)
 
         windspeed[np.where(np.isnan(windspeed))] = np.nan
@@ -191,7 +170,7 @@ class SARWind(Nansat, object):
             try: # Land mask
                 sar_windspeed = np.ma.masked_where(
                                     self.watermask()[1]==2, sar_windspeed)
-                palette.set_bad('k', 1.0) # Land is masked (bad)
+                palette.set_bad([.3, .3, .3], 1.0) # Land is masked (bad)
             except:
                 print 'Land mask not available'
         
@@ -220,12 +199,13 @@ class SARWind(Nansat, object):
 
         nansat_geotiff = Nansat(array=sar_windspeed, domain=self,
                                 parameters = {'name': 'masked_windspeed',
-                                              'minmax': '0 18'})
+                                              'minmax': '0 20'})
                         
         nansat_geotiff.write_geotiffimage(filename)
 
 
-    def plot(self, numVectorsX = 20, show=True, landmask=True, icemask=True):
+    def plot(self, filename=None, numVectorsX = 18, show=True,
+                landmask=True, icemask=True, flip=True):
         ''' Basic plotting function showing CMOD wind speed
         overlaid vectors in SAR image projection'''
 
@@ -252,16 +232,46 @@ class SARWind(Nansat, object):
         Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*model_windspeed
         Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*model_windspeed
 
+        # Make sure North is up, and east is right
+        if flip == True:
+            lon, lat = self.get_corners()
+            if lat[0] < lat[1]:
+                sar_windspeed = np.flipud(sar_windspeed)
+                Ux = -np.flipud(Ux)
+                Vx = -np.flipud(Vx)
+
+            if lon[0] > lon[2]:
+                sar_windspeed = np.fliplr(sar_windspeed)
+                Ux = np.fliplr(Ux)
+                Vx = np.fliplr(Vx)
+
         # Plotting
+        figSize = sar_windspeed.shape
+        legendPixels = 60.0
+        legendPadPixels = 5.0
+        legendFraction = legendPixels/figSize[0]
+        legendPadFraction = legendPadPixels/figSize[0]
+        dpi=100.0
+
+        fig = plt.figure()
+        fig.set_size_inches((figSize[1]/dpi, (figSize[0]/dpi)*
+                                (1+legendFraction+legendPadFraction)))
+        ax = fig.add_axes([0,0,1,1+legendFraction])
+        ax.set_axis_off()
         plt.imshow(sar_windspeed, cmap=palette, interpolation='nearest')
-        plt.clim([0, 18])
-        cbar = plt.colorbar()
-        plt.quiver(X, Y, Ux, Vx, angles='xy', 
-                    color=[.2, .2, .2], headaxislength=4)
-        plt.axis('off')
+        plt.clim([0, 20])
+        cbar = plt.colorbar(orientation='horizontal', shrink=.85,
+                     fraction=legendFraction, pad=legendPadFraction)
+        cbar.ax.set_ylabel('[m/s]', rotation=0)
+        cbar.ax.yaxis.set_label_position('right')
+        ax.quiver(X, Y, Ux, Vx, angles='xy', width=0.004,
+                    scale=numVectorsX*10, scale_units='width',
+                    color=[.0, .0, .0], headaxislength=4)
         if show:
-            plt.show()
-        return plt
+            fig.show()
+        if filename is not None:
+            fig.savefig(filename, pad_inches=0, dpi=dpi)
+        return fig
 
 
 ###################################
@@ -301,8 +311,7 @@ if __name__ == '__main__':
     # Save figure
     if args.figure_filename is not None:
         print 'Saving output as figure: ' + args.figure_filename
-        plt = sw.plot(show=False)
-        plt.savefig(args.figure_filename, bbox_inches='tight', dpi=300)
+        plt = sw.plot(filename=args.figure_filename, show=False)
 
     # Save as netCDF file
     if args.netCDF is not None:
