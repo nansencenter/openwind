@@ -31,9 +31,9 @@ To see explanation of all features:
 
 # Python usage:
 ```
->>> from openwind import SARwind
+>>> from openwind import SARWind
 
->>> s = SARwind(SAR_filename, winddir, pixelsize)
+>>> s = SARWind(SAR_filename, winddir, pixelsize)
 ```
 
 See above (command line usage) for specification of the input parameters.
@@ -50,7 +50,7 @@ If winddir is not specified when the SARWind object is generated with the Python
 ```
 >>> from openwind import SARWind
 
->>> s = SARwind(SAR_filename)
+>>> s = SARWind(SAR_filename)
 
 >>> s.crop(lonlim=[5, 6], latlim=[60, 61])
 
