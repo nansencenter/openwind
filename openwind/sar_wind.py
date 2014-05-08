@@ -284,7 +284,15 @@ class SARWind(Nansat, object):
         # Flip images if wanted
         if northUp_eastRight:
             if self.get_metadata()['ORBIT_DIRECTION'].lower()=='descending':
-                sar_windspeed = np.fliplr(sar_windspeed)
+                # NOTE: 
+                #       - the origin of ASAR grids is at first measurement (in
+                #       time) at near range
+                #       - the origin of Radarsat-2 grids is at first
+                #       measurement (in time) but at far range
+                #       - the origin of Sentinel-1 grids is ?
+                #       - the origin of Cosmo-Skymed grids is ?
+                if os.path.basename(self.fileName)[:3]=='ASA':
+                    sar_windspeed = np.fliplr(sar_windspeed)
                 Usat = -np.fliplr(Usat)
                 Vsat = np.fliplr(Vsat)
             else:
@@ -309,9 +317,9 @@ class SARWind(Nansat, object):
         return plt
 
     def save_wind_map_image(self, fileName, scale=None, landmask=True,
-            windspeedBand='windspeed', winddirBand='winddirection'):
+            windspeedBand='windspeed', winddirBand='winddirection', **kwargs):
         nMap = Nansatmap(self, resolution='l')
-        nMap.pcolormesh(self[windspeedBand],[3,15])
+        nMap.pcolormesh(self[windspeedBand], **kwargs)
         nMap.add_colorbar(fontsize=10)
         nMap.drawgrid()
 
