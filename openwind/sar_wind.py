@@ -28,18 +28,18 @@ class SARWind(Nansat, object):
     A class for calculating wind speed from SAR images using CMOD
     '''
 
-    def __init__(self, sar_image, winddir=None, pixelsize=500):
+    def __init__(self, sar_image, winddir=None, pixelsize=500, eResampleAlg=1):
         '''
             Parameters
             -----------
             sar_image : string
                         The SAR image filename - should be the original file.
-            winddir :   int/float (an arbitratry wind direction), 
+            winddir :   int/float (an arbitratry wind direction),
                         numpy array (an array of wind directions, same size as
-                        the SAR data), 
+                        the SAR data),
                         string (the name of a file with wind field information
                             which can be opened by nansat),
-                        Nansat (a Nansat object with wind direction), 
+                        Nansat (a Nansat object with wind direction),
                         None
 
                         Auxiliary wind field information needed to calculate
@@ -74,7 +74,7 @@ class SARWind(Nansat, object):
             self.resize(pixelsize=pixelsize)
 
         self.set_auxiliary(winddir)
-        self.calculate_wind()
+        self.calculate_wind(eResampleAlg=eResampleAlg)
 
     def set_look_direction(self):
         # OBS - this will only work on unprojected data.
@@ -103,7 +103,7 @@ class SARWind(Nansat, object):
             self.set_look_direction()
         super(SARWind, self).reproject(*args, **kwargs)
 
-    def get_auxiliary(self):
+    def get_auxiliary(self, eResampleAlg=1):
         '''
             Get auxiliary information (Nansat object with wind direction)
             needed to estimate wind speed from SAR
@@ -119,12 +119,14 @@ class SARWind(Nansat, object):
 
         if not self.winddir:
             try:
-                mw = ModelWind(self.SAR_image_time, domain=self)
+                mw = ModelWind(self.SAR_image_time, domain=self,
+                               eResampleAlg=eResampleAlg)
             except ValueError as e:
                 warnings.warn(e.message)
                 return None
         else:
-            mw = ModelWind(wind=self.winddir, domain=self)
+            mw = ModelWind(wind=self.winddir, domain=self,
+                           eResampleAlg=eResampleAlg)
 
         return mw
 
@@ -134,12 +136,12 @@ class SARWind(Nansat, object):
 
             Parameters
             -----------
-            winddir :   int/float (an arbitratry wind direction), 
+            winddir :   int/float (an arbitratry wind direction),
                         numpy array (an array of wind directions, same size as
-                        the SAR data), 
+                        the SAR data),
                         string (the name of a file with wind field information
                             which can be opened by nansat),
-                        Nansat (a Nansat object with wind direction), 
+                        Nansat (a Nansat object with wind direction),
                         None
 
                         Auxiliary wind field information needed to calculate
@@ -148,7 +150,8 @@ class SARWind(Nansat, object):
         # check input type
         self.winddir=winddir
 
-    def calculate_wind(self, winddir=None, storeModelSpeed=False):
+    def calculate_wind(self, winddir=None, storeModelSpeed=False,
+                       eResampleAlg=1):
         '''
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
@@ -158,7 +161,7 @@ class SARWind(Nansat, object):
 
         if not isinstance(self.winddir, int) and not isinstance(self.winddir,
                 float) and not isinstance(self.winddir, np.ndarray):
-            aux = self.get_auxiliary()
+            aux = self.get_auxiliary(eResampleAlg=eResampleAlg)
             if not aux:
                 print 'Did not calculate wind speeds'
                 return None
@@ -166,7 +169,13 @@ class SARWind(Nansat, object):
 
             # Check time difference between SAR image and wind direction object
             timediff = self.SAR_image_time - winddir_time
-            hoursDiff = np.abs(timediff.total_seconds()/3600.)
+            try:
+                secondsDiff = timediff.total_seconds()
+            except: # for < python2.7
+                secondsDiff = (timediff.microseconds +
+                               (timediff.seconds + timediff.days *
+                                24 * 3600) * 10**6) / 10**6
+            hoursDiff = np.abs(secondsDiff/3600.)
             print 'Time difference between SAR image and wind direction: ' \
                     + '%.2f' % hoursDiff + ' hours'
             print 'SAR image time: ' + str(self.SAR_image_time)
@@ -187,7 +196,7 @@ class SARWind(Nansat, object):
             v_array = aux[wind_v_bandNo]
             # 0 degrees meaning wind from North, 90 degrees meaning wind from East
             winddirArray = np.degrees(
-                    np.arctan2(-u_array, -v_array)) 
+                    np.arctan2(-u_array, -v_array))
         else:
             # Constant wind direction is input
             print 'Using constant wind (from) direction: ' + str(self.winddir) + \
@@ -239,9 +248,11 @@ class SARWind(Nansat, object):
         v = windspeed*np.cos((180.0 - winddirArray)*np.pi/180.0)
         self.add_band(array=u, parameters={
                             'wkv': 'eastward_wind',
+                            'time': winddir_time,
         })
         self.add_band(array=v, parameters={
                             'wkv': 'northward_wind',
+                            'time': winddir_time,
         })
 
     def plot(self, numVectorsX = 20, show=True, clim=[3,10], scale=None,
@@ -316,20 +327,67 @@ class SARWind(Nansat, object):
             plt.show()
         return plt
 
-    def save_wind_map_image(self, fileName, scale=None, landmask=True,
-            windspeedBand='windspeed', winddirBand='winddirection', **kwargs):
-        nMap = Nansatmap(self, resolution='l')
-        nMap.pcolormesh(self[windspeedBand], **kwargs)
-        nMap.add_colorbar(fontsize=10)
-        nMap.drawgrid()
+    def save_wind_map_image(self, fileName, scale=None, numArrowsRange=10,
+                            landmask=True,
+                            colorbar=True, fontsize=6,
+                            drawgrid=True, tight=True, title=None, **kwargs):
+
+        nMap = Nansatmap(self, resolution='l',figsize=(5, 8))
+
+        if 'vmin' in kwargs.keys():
+            vmin = kwargs.pop('vmin')
+        else:
+            vmin = 2
+        if 'vmax' in kwargs.keys():
+            vmax = kwargs.pop('vmax')
+        else:
+            vmax = 20
 
         # use wind direction "to" for calculating u and v
-        winddirection = np.mod(self[winddirBand]+180,360) 
-        Ux = np.sin(np.radians(winddirection))
-        Vx = np.cos(np.radians(winddirection))
-        nMap.quiver(Ux, Vx, scale=scale)
+        winddirection = np.mod(self['winddirection'] + 180, 360)
+        windspeed = self['windspeed']
 
-        nMap.save(fileName, landmask=landmask)
+        # Plot windspeed as colored grid
+        nMap.pcolormesh(windspeed, vmin=vmin, vmax=vmax)
+
+        # apply landmask to windspeeds
+        windspeed = np.ma.masked_where( self.watermask()[1]==2, windspeed )
+
+        quiPixelSpacing = int(np.round(windspeed.shape[1]/numArrowsRange))
+
+        # specify the number of quiver vectors
+        numQuiX = int(self.vrt.dataset.RasterXSize / quiPixelSpacing)
+        numQuiY = int(self.vrt.dataset.RasterYSize / quiPixelSpacing)
+
+        if scale is None and np.max(windspeed) <= 10.0:
+            scale = 200
+        elif scale is None:
+            scale = 300
+
+        # Draw quivers
+        Ux = np.sin(np.radians(winddirection)) * windspeed
+        Vx = np.cos(np.radians(winddirection)) * windspeed
+        nMap.quiver(Ux, Vx, scale=scale,
+                    quivectors=(numQuiY, numQuiX))
+        # NO HARDCODING - GRID SIZES CHANGE
+        #,
+        #            width=0.002, X=0.8, Y=0.1, U=10, label='10 m/sec',
+        #            fontproperties={'size':8})
+
+        if colorbar:
+            nMap.add_colorbar(fontsize=fontsize)
+
+        if drawgrid:
+            nMap.drawgrid()
+
+        if title is not None:
+            plt.title(title, fontsize=10)
+
+        if tight:
+            nMap.fig.tight_layout()
+
+        nMap.save(fileName, landmask=landmask, **kwargs)
+
 
 ###################################
 #    If run from command line

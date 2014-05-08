@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------------
 # Name:		model_wind.py
-# Purpose:      
+# Purpose:
 #
 # Author:       Morten Wergeland Hansen, Knut-Frode Dagestad
 # Modified:	Morten Wergeland Hansen
@@ -24,14 +24,15 @@ get_grib = os.path.join(openWindFolder, 'get_grib.pl ')
 
 class ModelWind(Nansat, object):
 
-    def __init__(self, time=None, wind=None, domain=None, *args, **kwargs):
+    def __init__(self, time=None, wind=None, domain=None, eResampleAlg=1, *args, **kwargs):
         '''
             Get model wind field, and optionally reproject it to a given
             domain.
 
             At least 'time' or 'wind' (filename or Nansat object) is required
             as input. The 'time' input is ignored if both are provided.
-            
+
+
             Parameters
             -----------
             time : datetime - the appreciated time of the model wind field
@@ -42,7 +43,7 @@ class ModelWind(Nansat, object):
             raise ValueError(
                     "At least 'time' or 'wind' is required as input"
                     )
-        
+
         self.downloaded = ''
 
         if wind:
@@ -74,7 +75,7 @@ class ModelWind(Nansat, object):
 
         if domain:
             # Bi-linear interpolation onto given domain
-            self.reproject(domain, eResampleAlg=1)
+            self.reproject(domain, eResampleAlg=eResampleAlg)
 
     def __del__(self):
         if self.downloaded and os.path.exists(self.downloaded):
@@ -96,19 +97,25 @@ class ModelWind(Nansat, object):
             return True
 
     def download_ncep(self, time, outFolder = ''):
-    
+
         time = time.replace(tzinfo=None) # Remove timezone information
         # Find closest 6 hourly modelrun and forecast hour
         modelRunHour = round((time.hour + time.minute/60.)/6)*6
         nearestModelRun = datetime(time.year, time.month, time.day) \
             + timedelta(hours=modelRunHour)
-        forecastHour = (time - nearestModelRun).total_seconds()/3600.
+        try:
+            forecastHour = (time - nearestModelRun).total_seconds()/3600.
+        except: # for < python2.7
+            td = time - nearestModelRun
+            forecastHour = ((td.microseconds +
+                             (td.seconds + td.days * 24 * 3600) * 10**6)
+                            / 10**6) /3600.
         if forecastHour < 1.5:
             forecastHour = 0
         else:
             forecastHour = 3
-    
-        # Try to get NRT data from 
+
+        # Try to get NRT data from
         # ftp://ftp.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/
         # Avaliable approximately the latest month
         url = 'ftp://ftp.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/' \
@@ -127,8 +134,8 @@ class ModelWind(Nansat, object):
                 return outFileName
             else:
                 print 'NRT GRIB file not available: ' + url
-    
-        # If NRT file not available, 
+
+        # If NRT file not available,
         # coninue to search for archived file
         url = 'http://nomads.ncdc.noaa.gov/data/gfs4/' + \
             nearestModelRun.strftime('%Y%m/%Y%m%d/')
@@ -138,7 +145,7 @@ class ModelWind(Nansat, object):
         fileName = baseName + '.grb2'
         outFileName = outFolder + fileName
         print 'Downloading ' + url + fileName
-    
+
         # Download subset of grib file
         if not os.path.exists(fileName):
             command = get_inv + url + baseName \
