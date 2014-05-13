@@ -10,7 +10,6 @@ import argparse
 from datetime import datetime
 
 import numpy as np
-import pdb
 
 try:
     import matplotlib.pyplot as plt
@@ -289,7 +288,7 @@ class SARWind(Nansat, object):
         if filename is not None:
             fig.savefig(filename, pad_inches=0, dpi=dpi)
         if show:
-            fig.show()
+            plt.show()
         return fig
 
 
