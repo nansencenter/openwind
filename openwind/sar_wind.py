@@ -10,6 +10,7 @@ import argparse
 from datetime import datetime
 
 import numpy as np
+import pdb
 
 try:
     import matplotlib.pyplot as plt
@@ -27,17 +28,21 @@ class SARWind(Nansat, object):
     A class for calculating wind speed from SAR images using CMOD
     '''
 
-    def __init__(self, SAR_filename, winddir=None, pixelsize=500):
+    def __init__(self, sar_image, winddir=None, pixelsize=500):
         '''
             Parameters
             -----------
-            SAR_filename : string
+            sar_image : string or Nansat object
                 SAR image filename (original, raw file)
             winddir : int, string, Nansat, None
                 Auxiliary wind field information needed to calculate
                 SAR wind (must be or have wind direction)
         '''
-        super(SARWind, self).__init__(SAR_filename)
+        if isinstance(sar_image, str) or isinstance(sar_image, unicode):
+            super(SARWind, self).__init__(sar_image)
+        elif isinstance(sar_image, Nansat):
+            super(SARWind, self).__init__(domain=sar_image)
+            self.vrt = sar_image.vrt
 
         # Check that this is a SAR image with VV pol NRCS
         try:
@@ -261,6 +266,7 @@ class SARWind(Nansat, object):
         plt.imshow(sar_windspeed, cmap=palette, interpolation='nearest')
         plt.clim([0, 20])
         cbar = plt.colorbar(orientation='horizontal', shrink=.85,
+                     aspect=40,
                      fraction=legendFraction, pad=legendPadFraction)
         cbar.ax.set_ylabel('[m/s]', rotation=0)
         cbar.ax.yaxis.set_label_position('right')
