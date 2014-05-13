@@ -19,7 +19,6 @@ except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
 from nansat import Nansat, Domain
-from model_wind import ModelWind
 from cmod5n import cmod5n_inverse
 
 
@@ -68,20 +67,39 @@ class SARWind(Nansat, object):
 
     def calculate_wind(self, winddir=None, storeModelSpeed=True):
         # Calculate wind speed from SAR sigma0 in VV polarization
+
         if winddir:
             self.winddir = winddir
-        if not isinstance(self.winddir, int):
-            if self.winddir is None or self.winddir == 'online':
-                self.modelWind = ModelWind(time=self.SAR_image_time)
-            else:
-                if isinstance(self.winddir, ModelWind):
-                    self.modelWind = self.winddir
-                else:
-                    self.modelWind = ModelWind(wind=self.winddir)
-            winddir_time = self.modelWind.time 
+        if self.winddir is None or self.winddir == 'online':
+            self.winddir = 'ncep_wind_online' # default source
+
+        if isinstance(self.winddir, int):
+            # Constant wind direction is input
+            print 'Using constant wind (from) direction: ' + str(self.winddir) + \
+                    ' degrees clockwise from North'
+            winddirArray = np.ones(self.shape())*self.winddir
+            winddir_time = None
+            storeModelSpeed = False # Not relevant if direction given as number
+        else:
+            # Nansat readable file
+            if isinstance(self.winddir, str):
+                try:
+                    self.winddir = Nansat(self.winddir)
+                except:
+                    try:
+                        self.winddir = Nansat(self.winddir + 
+                                            datetime.strftime(
+                                            self.SAR_image_time, ':%Y%m%d%H%M'))
+                    except:
+                        pass
+
+            if not isinstance(self.winddir, Nansat):
+                raise ValueError('Wind direction not available')
+
+            winddir_time = self.winddir.get_time()[0]
 
             # Bi-linear interpolation onto SAR image
-            self.modelWind.reproject(self, eResampleAlg=1)
+            self.winddir.reproject(self, eResampleAlg=1)
 
             # Check time difference between SAR image and wind direction object
             timediff = self.SAR_image_time - winddir_time
@@ -95,24 +113,18 @@ class SARWind(Nansat, object):
                 print 'WARNING: time difference exceeds 3 hours!'
                 print '#########################################'
 
-            wind_u_bandNo = self.modelWind._get_band_number({
+            wind_u_bandNo = self.winddir._get_band_number({
                                 'standard_name': 'eastward_wind',
                             })
-            wind_v_bandNo = self.modelWind._get_band_number({
+            wind_v_bandNo = self.winddir._get_band_number({
                                 'standard_name': 'northward_wind',
                             })
             # Get wind direction
-            u_array = self.modelWind[wind_u_bandNo]
-            v_array = self.modelWind[wind_v_bandNo]
+            u_array = self.winddir[wind_u_bandNo]
+            v_array = self.winddir[wind_v_bandNo]
             winddirArray = np.degrees(
                     np.arctan2(-u_array, -v_array)) # 0 from North, 90 from East
-        else:
-            # Constant wind direction is input
-            print 'Using constant wind (from) direction: ' + str(self.winddir) + \
-                    ' degrees clockwise from North'
-            winddirArray = np.ones(self.shape())*self.winddir
-            winddir_time = None
-            storeModelSpeed = False # No windsped available, if direction given as number
+
 
         # Calculate SAR wind with CMOD
         # TODO: 
@@ -144,7 +156,7 @@ class SARWind(Nansat, object):
                 })
 
         if storeModelSpeed:
-            self.add_band(array=self.modelWind['windspeed'], parameters={
+            self.add_band(array=self.winddir['windspeed'], parameters={
                             'wkv': 'wind_speed',
                             'name': 'model_windspeed',
                             'time': winddir_time,
@@ -209,8 +221,8 @@ class SARWind(Nansat, object):
         nansat_geotiff.write_geotiffimage(filename)
 
 
-    def plot(self, filename=None, numVectorsX = 18, show=True,
-                landmask=True, icemask=True, flip=True):
+    def plot(self, filename=None, numVectorsX = 16, show=True,
+                landmask=True, icemask=True, flip=True, maskWindAbove=35):
         ''' Basic plotting function showing CMOD wind speed
         overlaid vectors in SAR image projection'''
 
@@ -219,6 +231,7 @@ class SARWind(Nansat, object):
         except:
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(winddir) before plotting.')
+        sar_windspeed[sar_windspeed>maskWindAbove] = np.nan
 
         winddirReductionFactor = np.round(
                 self.vrt.dataset.RasterXSize/numVectorsX)
@@ -232,7 +245,7 @@ class SARWind(Nansat, object):
             model_windspeed = self['model_windspeed']
             model_windspeed = model_windspeed[Y, X]
         except:
-            model_windspeed = np.ones(X.shape)
+            model_windspeed = 8*np.ones(X.shape)
 
         Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*model_windspeed
         Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*model_windspeed
@@ -265,18 +278,18 @@ class SARWind(Nansat, object):
         ax.set_axis_off()
         plt.imshow(sar_windspeed, cmap=palette, interpolation='nearest')
         plt.clim([0, 20])
-        cbar = plt.colorbar(orientation='horizontal', shrink=.85,
+        cbar = plt.colorbar(orientation='horizontal', shrink=.80,
                      aspect=40,
                      fraction=legendFraction, pad=legendPadFraction)
         cbar.ax.set_ylabel('[m/s]', rotation=0)
         cbar.ax.yaxis.set_label_position('right')
         ax.quiver(X, Y, Ux, Vx, angles='xy', width=0.004,
-                    scale=numVectorsX*10, scale_units='width',
+                    scale=200, scale_units='width',
                     color=[.0, .0, .0], headaxislength=4)
-        if show:
-            fig.show()
         if filename is not None:
             fig.savefig(filename, pad_inches=0, dpi=dpi)
+        if show:
+            fig.show()
         return fig
 
 
