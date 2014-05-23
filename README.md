@@ -10,15 +10,16 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 # Command line usage:
 
 ```
-./sar_wind.py -s SAR_image -w winddir -f figure_filename -n netCDF_filename -p pixelsize
+./sar_wind.py -s SAR_filename -w winddir -f figure_filename -n netCDF_filename -p pixelsize
 ```
 
-- SAR_image is a file readable by Nansat, containing NRCS in VV polarisation
+- SAR_filename is a file readable by Nansat, containing Normalised Radar Cross Section (NRCS)
 
 - winddir is either:
   - a file readable by Nansat, containing wind direction (U10 and V10)
   - an integer indicating constant wind direction (0 from North, 90 from East etc)
-  - None or omitted [DEFAULT]: NCEP GFS model wind is downloaded from NCEP NOMADS, if available for the time of the SAR image
+  - a string 'wind_archive': matching wind field is obtained from local file archive. See templates/mapper_wind_archive_template.py for configuration.
+  - the string 'online' [DEFAULT]: NCEP GFS model wind is downloaded from NCEP NOMADS, if available for the time of the SAR image
 
 - pixelsize is given in meters (500 m by default). Use pixelsize='fullres' for no resizing (usually not recommended).
 
@@ -30,9 +31,9 @@ To see explanation of all features:
 
 # Python usage:
 ```
->>> from openwind import SARwind
+>>> from openwind import SARWind
 
->>> s = SARwind(SAR_image, winddir, pixelsize)
+>>> s = SARWind(SAR_filename, winddir, pixelsize)
 ```
 
 See above (command line usage) for specification of the input parameters.
@@ -40,16 +41,16 @@ See above (command line usage) for specification of the input parameters.
 
 To plot the result and save as figure:
 ```
->>> plt = s.plot() # to plot SAR wind overlaid wind vectors.
+>>> s.plot() # to plot SAR wind overlaid wind vectors.
 
->>> plt.savefig(filename, bbox_inches='tight', dpi=300) # Save to file
+>>> s.plot(filename, show=False) # Save to file
 ```
 
 If winddir is not specified when the SARWind object is generated with the Python API, wind speed is automatically calculated using ncep model wind downloaded from NCEP NOMADS. You can modify the SAR image (e.g. resizing or cropping) before calling SARWind as long as the SAR image file is not a previously exported reprojected/resized/cropped image:
 ```
 >>> from openwind import SARWind
 
->>> from nansat import Nansat
+>>> s = SARWind(SAR_filename)
 
 >>> n = Nansat(SAR_image)
 
@@ -58,13 +59,12 @@ If winddir is not specified when the SARWind object is generated with the Python
 >>> s = SARWind(n)
 ```
 
-Note that this is slower than first calculating the wind, then doing the modifications.
-
-
 # Notes:
 - GDAL might need to be compiled with the option --with-jasper to be able to read the downloaded NCEP GFS GRIB2-files
 
 # Acknowledgments
+
+OpenWind is developed with support from the Norwegian Space Centre.
 
 Thanks to the Royal Netherlands Meteorological Institute
 (http://www.knmi.nl/scatterometer/cmod5/) for making the cmod5 software
