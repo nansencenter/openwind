@@ -211,9 +211,11 @@ class SARWind(Nansat, object):
         v = windspeed*np.cos((180.0 - wind_direction_array)*np.pi/180.0)
         self.add_band(array=u, parameters={
                             'wkv': 'eastward_wind',
+                            'time': wind_direction_time,
         })
         self.add_band(array=v, parameters={
                             'wkv': 'northward_wind',
+                            'time': wind_direction_time,
         })
 
     def _get_masked_windspeed(self, landmask=True, icemask=True):
@@ -368,60 +370,69 @@ class SARWind(Nansat, object):
         return fig
 
     def save_wind_map_image(self, fileName, scale=None, numArrowsRange=10,
-                            landmask=True,
-                            colorbar=True, fontsize=6,
-                            drawgrid=True, tight=True, title=None, **kwargs):
+                            landmask=True, colorbar=True, cbar_fontsize=6,
+                            clim=None, drawgrid=True, tight=True,
+                            title=None, title_fontsize=10,
+                            edgecolor=None, quiverScaleCriteria=None,
+                            **kwargs):
+
+        pcolormeshArgs = {'vmin': 0, 'vmax':20}
+        for iKey in pcolormeshArgs.keys():
+            if iKey in kwargs.keys():
+                pcolormeshArgs[iKey] = kwargs.pop(iKey)
+
+        quiverArgs = {'X':None, 'Y':None, 'U':None, 'label':None,
+                      'labelpos':'E', 'coordinates':'figure',
+                      'fontproperties':None, 'width':None}
+        for iKey in quiverArgs:
+            if 'quiver_' + iKey in kwargs.keys():
+                quiverArgs[iKey] = kwargs.pop('quiver_'+iKey)
 
         nMap = Nansatmap(self, resolution='l',figsize=(5, 8))
-
-        if 'vmin' in kwargs.keys():
-            vmin = kwargs.pop('vmin')
-        else:
-            vmin = 2
-        if 'vmax' in kwargs.keys():
-            vmax = kwargs.pop('vmax')
-        else:
-            vmax = 20
 
         # use wind direction "to" for calculating u and v
         winddirection = np.mod(self['winddirection'] + 180, 360)
         windspeed = self['windspeed']
+        windspeedPcolor = np.copy(windspeed)
 
-        # Plot windspeed as colored grid
-        nMap.pcolormesh(windspeed, vmin=vmin, vmax=vmax)
+        # if data has non-value (dark blue), replace to Nan
+        if edgecolor is not None:
+            # Replace the edge color (dark blue) to white
+            windspeedPcolor[windspeedPcolor == edgecolor] = np.NaN
+        # Put colormesh
+        nMap.pcolormesh(windspeedPcolor, **pcolormeshArgs)
 
         # apply landmask to windspeeds
-        windspeed = np.ma.masked_where( self.watermask()[1]==2, windspeed )
+        windspeed = np.ma.masked_where(self.watermask()[1]==2, windspeed)
 
+        # specify the number of quiver
         quiPixelSpacing = int(np.round(windspeed.shape[1]/numArrowsRange))
-
-        # specify the number of quiver vectors
         numQuiX = int(self.vrt.dataset.RasterXSize / quiPixelSpacing)
         numQuiY = int(self.vrt.dataset.RasterYSize / quiPixelSpacing)
 
-        if scale is None and np.max(windspeed) <= 10.0:
-            scale = 200
-        elif scale is None:
-            scale = 300
+        # compute maximum wind speed on the sea
+        maxSpeed = max(windspeed[windspeed.mask == False])
+        # compute a scale for quiver lenght
+        scale = None
+        if quiverScaleCriteria is not None:
+            for iKey in quiverScaleCriteria.keys():
+                if eval(iKey %maxSpeed):
+                    scale = quiverScaleCriteria[iKey]
 
         # Draw quivers
         Ux = np.sin(np.radians(winddirection)) * windspeed
         Vx = np.cos(np.radians(winddirection)) * windspeed
         nMap.quiver(Ux, Vx, scale=scale,
-                    quivectors=(numQuiY, numQuiX))
-        # NO HARDCODING - GRID SIZES CHANGE
-        #,
-        #            width=0.002, X=0.8, Y=0.1, U=10, label='10 m/sec',
-        #            fontproperties={'size':8})
+                    quivectors=(numQuiY, numQuiX), **quiverArgs)
 
         if colorbar:
-            nMap.add_colorbar(fontsize=fontsize)
+            nMap.add_colorbar(fontsize=cbar_fontsize)
 
         if drawgrid:
             nMap.drawgrid()
 
         if title is not None:
-            plt.title(title, fontsize=10)
+            plt.title(title, fontsize=title_fontsize)
 
         if tight:
             nMap.fig.tight_layout()
