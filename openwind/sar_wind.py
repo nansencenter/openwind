@@ -84,13 +84,13 @@ class SARWind(Nansat, object):
             #if hirlam in aux_wind_source:
             #    wind_mapper = 'hirlam_wind_online' # use mapper for online hirlam data
         else:
-            # A filename 
+            # A filename
             aux_wind = Nansat(aux_wind_source)
         return aux_wind
 
     def _check_wind_direction_array_dims(self, wind_directions):
         '''
-            Check and return the provided array of wind directions 
+            Check and return the provided array of wind directions
         '''
         if not wind_directions.shape()==self.shape():
             raise RuntimeError('The provided wind direction array ' \
@@ -233,15 +233,15 @@ class SARWind(Nansat, object):
                 palette.set_bad([.3, .3, .3], 1.0) # Land is masked (bad)
             except:
                 print 'Land mask not available'
-        
+
         if icemask:
             try: # Ice mask
-                try: # first try local file 
-                    ice = Nansat('metno_local_hires_seaice_' + 
-                            self.SAR_image_time.strftime('%Y%m%d'), 
+                try: # first try local file
+                    ice = Nansat('metno_local_hires_seaice_' +
+                            self.SAR_image_time.strftime('%Y%m%d'),
                             mapperName='metno_local_hires_seaice')
                 except: # otherwise Thredds
-                    ice = Nansat('metno_hires_seaice:' + 
+                    ice = Nansat('metno_hires_seaice:' +
                             self.SAR_image_time.strftime('%Y%m%d'))
                 ice.reproject(self)
                 iceBandNo = ice._get_band_number(
@@ -260,7 +260,7 @@ class SARWind(Nansat, object):
         nansat_geotiff = Nansat(array=sar_windspeed, domain=self,
                                 parameters = {'name': 'masked_windspeed',
                                               'minmax': '0 20'})
-                        
+
         nansat_geotiff.write_geotiffimage(filename)
 
 
@@ -442,7 +442,7 @@ if __name__ == '__main__':
             default='online', help='Wind direction filename or constant '
                 ' (integer, 0 for wind from North, 90 for wind from East etc.). '
                 'Omit this argument for automatic download of NCEP GFS winds.')
-    parser.add_argument('-n', dest='netCDF', 
+    parser.add_argument('-n', dest='netCDF',
             help='Export numerical output to NetCDF file')
     parser.add_argument('-f', dest='figure_filename',
             help='Save wind plot as figure (e.g. PNG or JPEG)')
