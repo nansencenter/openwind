@@ -7,9 +7,6 @@
 #               http://www.gnu.org/licenses/gpl-3.0.html
 
 
-# TODO:
-#       - change parameter name "winddir" to "wind_direction"
-
 import argparse
 import warnings
 from datetime import datetime
@@ -24,8 +21,6 @@ except:
 
 from nansat import Nansat, Nansatmap, Domain
 from cmod5n import cmod5n_inverse
-
-import pdb
 
 class SARWind(Nansat, object):
     '''
