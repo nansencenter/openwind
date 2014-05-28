@@ -371,17 +371,17 @@ class SARWind(Nansat, object):
 
     def save_wind_map_image(self, fileName, scale=None, numArrowsRange=10,
                             landmask=True, colorbar=True, cbar_fontsize=6,
-                            clim=None, drawgrid=True, tight=True,
-                            title=None, title_fontsize=10,
+                            drawgrid=True, title=None, title_fontsize=10,
                             edgecolor=None, quiverScaleCriteria=None,
-                            **kwargs):
+                            tight=True, **kwargs):
 
         pcolormeshArgs = {'vmin': 0, 'vmax':20}
         for iKey in pcolormeshArgs.keys():
             if iKey in kwargs.keys():
                 pcolormeshArgs[iKey] = kwargs.pop(iKey)
 
-        quiverArgs = {'X':None, 'Y':None, 'U':None, 'label':None,
+        quiverArgs = {'X':None, 'Y':None, 'U':None,
+                      'label':None,
                       'labelpos':'E', 'coordinates':'figure',
                       'fontproperties':None, 'width':None}
         for iKey in quiverArgs:
