@@ -18,10 +18,9 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 - winddir is either:
   - a file readable by Nansat, containing wind direction (U10 and V10)
   - an integer indicating constant wind direction (0 from North, 90 from East etc)
-  - a string 'wind_archive': matching wind field is obtained from local file archive. See templates/mapper_wind_archive_template.py for configuration.
-  - the string 'online' [DEFAULT]: NCEP GFS model wind is downloaded from NCEP NOMADS, if available for the time of the SAR image
+  - name (string) of a mapper with functionality to find a wind file (online or on local disk) matching the SAR image time [DEFAULT: 'ncep_wind_online']
 
-- pixelsize is given in meters (500 m by default). Use pixelsize='fullres' for no resizing (usually not recommended).
+- pixelsize is given in meters (500 m by default). Use pixelsize='fullres' for no resizing (usually not recommended, unless image is small or cropped).
 
 To see explanation of all features:
 ```
@@ -33,10 +32,11 @@ To see explanation of all features:
 ```
 >>> from openwind import SARWind
 
->>> s = SARWind(SAR_filename, winddir, pixelsize)
+>>> s = SARWind(SAR_image, winddir, pixelsize)
 ```
 
 See above (command line usage) for specification of the input parameters.
+SAR image may here also be a Nansat SAR object (containing NRCS, incidence angle and look direction)
 
 
 To plot the result and save as figure:
@@ -46,18 +46,6 @@ To plot the result and save as figure:
 >>> s.plot(filename, show=False) # Save to file
 ```
 
-If winddir is not specified when the SARWind object is generated with the Python API, wind speed is automatically calculated using ncep model wind downloaded from NCEP NOMADS. You can modify the SAR image (e.g. resizing or cropping) before calling SARWind as long as the SAR image file is not a previously exported reprojected/resized/cropped image:
-```
->>> from openwind import SARWind
-
->>> s = SARWind(SAR_filename)
-
->>> n = Nansat(SAR_image)
-
->>> n.crop(lonlim=[5, 6], latlim=[60, 61])
-
->>> s = SARWind(n)
-```
 
 # Notes:
 - GDAL might need to be compiled with the option --with-jasper to be able to read the downloaded NCEP GFS GRIB2-files

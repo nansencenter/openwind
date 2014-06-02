@@ -27,7 +27,8 @@ class SARWind(Nansat, object):
     A class for calculating wind speed from SAR images using CMOD
     '''
 
-    def __init__(self, sar_image, wind_direction='online', pixelsize=500, eResampleAlg=1):
+    def __init__(self, sar_image, wind_direction='ncep_wind_online', 
+                    pixelsize=500, eResampleAlg=1):
         '''
             Parameters
             -----------
@@ -35,14 +36,16 @@ class SARWind(Nansat, object):
                         The SAR image as a filename or Nansat object
             wind_direction : int, numpy array, string, Nansat
                         Auxiliary wind field information needed to calculate
-                        SAR wind (must be or have wind direction in degrees)
+                        SAR wind (must be or have wind direction in degrees):
 
-                        An arbitrary (constant) wind direction,
-                        An array of wind directions, same size as the SAR data,
-                        The name of a file with wind field information (and
-                        which can be opened by nansat) or 'online' (to use
-                        ncep forecast wind available online),
-                        A Nansat object with wind direction.
+                        - constant wind direction (integer),
+                        - array of wind directions, same size as the SAR data,
+                        - the name of a Nansat compatible file containing
+                          wind direction information
+                        - name of a mapper with functionality to find a wind
+                          file (online or on local disk) matching the SAR
+                          image time [DEFAULT: 'ncep_wind_online']
+                        - a Nansat object with wind direction.
 
         '''
         if isinstance(sar_image, str) or isinstance(sar_image, unicode):
@@ -71,16 +74,17 @@ class SARWind(Nansat, object):
         self.calculate_wind(wind_direction,eResampleAlg=eResampleAlg)
 
     def _get_aux_wind_from_str(self, aux_wind_source):
-        if 'online' in aux_wind_source:
-            # use mapper for online ncep data
-            aux_wind = Nansat('ncep_wind_online' + \
-                        datetime.strftime(self.SAR_image_time, \
-                        ':%Y%m%d%H%M'))
-            #if hirlam in aux_wind_source:
-            #    wind_mapper = 'hirlam_wind_online' # use mapper for online hirlam data
-        else:
-            # A filename
+        
+        try:
+            # If a complete filename of wind dir source is given
             aux_wind = Nansat(aux_wind_source)
+        except:
+            # If only mapper name is given, we add the SAR image
+            # timestamp as string. Mappers with this functionality
+            # implemented will then find a matching file
+            aux_wind = Nansat(aux_wind_source +
+                                datetime.strftime(
+                                self.SAR_image_time, ':%Y%m%d%H%M'))
         return aux_wind
 
     def _check_wind_direction_array_dims(self, wind_directions):
@@ -136,8 +140,8 @@ class SARWind(Nansat, object):
         return np.degrees(np.arctan2(-u_array, -v_array)), \
                 wind_direction_time, aux_wind['windspeed']
 
-    def calculate_wind(self, wind_direction, storeModelSpeed=True,
-                       eResampleAlg=1):
+    def calculate_wind(self, wind_direction='ncep_wind_online', 
+                        storeModelSpeed=True, eResampleAlg=1):
         '''
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
@@ -341,6 +345,8 @@ class SARWind(Nansat, object):
                      fraction=legendFraction, pad=legendPadFraction)
         cbar.ax.set_ylabel('[m/s]', rotation=0) # could replace m/s by units from metadata
         cbar.ax.yaxis.set_label_position('right')
+        # TODO: plotting function should be improved to give
+        #       nice results for images of all sized
         ax.quiver(X, Y, Ux, Vx, angles='xy', width=0.004,
                     scale=200, scale_units='width',
                     color=[.0, .0, .0], headaxislength=4)
@@ -431,7 +437,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', dest='SAR_filename',
             required=True, help='SAR image filename')
     parser.add_argument('-w', dest='wind_direction',
-            default='online', help='Wind direction filename or constant '
+            default='ncep_wind_online', help='Wind direction filename or constant '
                 ' (integer, 0 for wind from North, 90 for wind from East etc.). '
                 'Omit this argument for automatic download of NCEP GFS winds.')
     parser.add_argument('-n', dest='netCDF',
