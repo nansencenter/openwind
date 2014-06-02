@@ -262,10 +262,10 @@ class SARWind(Nansat, object):
 
 
 
-    def plot(self, filename=None, numVectorsX = 20, show=True, clim=[0,20], scale=None,
+    def plot(self, filename=None, numVectorsX = 16, show=True, 
+            clim=[0,20], maskWindAbove=35,
             windspeedBand='windspeed', winddirBand='winddirection',
-            northUp_eastRight=True, landmask=True, icemask=True,
-            maskWindAbove=35):
+            northUp_eastRight=True, landmask=True, icemask=True):
         ''' Basic plotting function showing CMOD wind speed
         overlaid vectors in SAR image projection
 
@@ -277,14 +277,8 @@ class SARWind(Nansat, object):
         show : Boolean
         clim : list
             Color limits of the image.
-        scale : None or float
-            Data units per arrow length unit, e.g., m/s per plot width;
-            a smaller scale parameter makes the arrow longer.
-            If None, a simple autoscaling algorithm is used,
-            based on the average vector length and the number of vectors.
-            The arrow length unit is given by the scale_units parameter.
-        windspeedBand :
-        winddirBand :
+        windspeedBand : string or int
+        winddirBand : string or int
         landmask : Boolean
         icemask : Boolean
         maskWindAbove : int
@@ -297,43 +291,35 @@ class SARWind(Nansat, object):
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(wind_direction) before plotting.')
         sar_windspeed[sar_windspeed>maskWindAbove] = np.nan
-
+ 
         winddirReductionFactor = np.round(
                 self.vrt.dataset.RasterXSize/numVectorsX)
 
-        Vgeo = np.cos(np.radians(self[winddirBand]+180)) # add 180 deg to get "to"-direction
-        Ugeo = np.sin(np.radians(self[winddirBand]+180))
+        winddir_relative_up = 360 - self[winddirBand] + \
+                                    self.azimuth_up()
+        indX = range(0, self.vrt.dataset.RasterXSize, winddirReductionFactor)
+        indY = range(0, self.vrt.dataset.RasterYSize, winddirReductionFactor)
+        X, Y = np.meshgrid(indX, indY)
+        try: # scaling of wind vector length, if model wind is available
+            model_windspeed = self['model_windspeed']
+            model_windspeed = model_windspeed[Y, X]
+        except:
+            model_windspeed = 8*np.ones(X.shape)
 
-        # Transformation of the wind directions
-        Usat = ( Vgeo*np.sin(np.radians(self.azimuth_up())) -
-                    Ugeo*np.cos(np.radians(self.azimuth_up())) )
-        Vsat = -( Vgeo*np.cos(np.radians(self.azimuth_up())) +
-                    Ugeo*np.sin(np.radians(self.azimuth_up())) )
+        Ux = np.sin(np.radians(winddir_relative_up[Y, X]))*model_windspeed
+        Vx = np.cos(np.radians(winddir_relative_up[Y, X]))*model_windspeed
 
         # Make sure North is up, and east is right
         if northUp_eastRight:
             lon, lat = self.get_corners()
             if lat[0] < lat[1]:
                 sar_windspeed = np.flipud(sar_windspeed)
-                Usat = -np.flipud(Usat)
-                Vsat = -np.flipud(Vsat)
+                Ux = -np.flipud(Ux)
+                Vx = -np.flipud(Vx)
             if lon[0] > lon[2]:
                 sar_windspeed = np.fliplr(sar_windspeed)
-                Usat = np.fliplr(Usat)
-                Vsat = np.fliplr(Vsat)
-
-        X, Y = np.meshgrid(range(0, self.vrt.dataset.RasterXSize,
-                                    winddirReductionFactor),
-                           range(0, self.vrt.dataset.RasterYSize,
-                                    winddirReductionFactor))
-        try: # scaling of wind vector length, if model wind is available
-            model_windspeed = self['model_windspeed']
-            model_windspeed = model_windspeed[Y, X]
-        except:
-            model_windspeed = 10*np.ones(X.shape)
-
-        Ux = Usat[Y, X]*model_windspeed
-        Vx = Vsat[Y, X]*model_windspeed
+                Ux = np.fliplr(Ux)
+                Vx = np.fliplr(Vx)
 
         # Plotting
         figSize = sar_windspeed.shape
