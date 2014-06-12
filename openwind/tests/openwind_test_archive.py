@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:12.06.2014 14:07
+# Last modified:12.06.2014 14:43
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -69,7 +69,8 @@ class TestData():
             self.asar.append(asar_agulhas)
         if ncep_agulhas:
             self.ncep4asar.append(ncep_agulhas)
-        if 'rs2' in globals():
+        # check for data from local archives
+        if 'rs2' in globals() and rs2:
             self.radarsat2.append(rs2)
         if self.asar:
             self.noData = False

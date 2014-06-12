@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:12.06.2014 13:26
+# Last modified:12.06.2014 14:42
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -20,4 +20,6 @@ try:
     with open(rs2) as f:
         pass
 except IOError as exc:
-    raise IOError("%s: %s" % (rs2, exc.strerror))
+    rs2 = None
+    print "I/O Error (%s): %s" %(rs2, exc.strerror)
+    #raise IOError("%s: %s" % (rs2, exc.strerror))
