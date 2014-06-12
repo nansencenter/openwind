@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:27.05.2014 10:49
+# Last modified:12.06.2014 13:54
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -31,6 +31,11 @@ class SARWindTest(unittest.TestCase):
     def setUp(self):
         if test_data.noData:
             raise ValueError('No test data available')
+
+    def test_sarwind_using_default(self):
+        for i in range(len(test_data.radarsat2)):
+            w = SARWind(test_data.radarsat2[i])
+            self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_filenames(self):
         for i in range(len(test_data.asar)):

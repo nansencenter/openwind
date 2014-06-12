@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:27.05.2014 10:46
+# Last modified:12.06.2014 14:07
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -41,6 +41,9 @@ except ImportError as e:
     print '\nPlease place a module openwind_local_archive on your python ' \
         'path and add paths to local test data if you have any, then ' \
         'update openwind.tests.test_sarwind.py.\n'
+except IOError as e:
+    print e.message
+
 
 
 '''
@@ -56,8 +59,9 @@ if not os.path.isfile(asar_agulhas) or not os.path.isfile(ncep_agulhas):
 '''
 class TestData():
     asar = []
+    radarsat2 = []
     ncep4asar = []
-    noData = False
+    noData = True
 
     def __init__(self):
         # OBS: SAR and wind data must be added in pairs for each test
@@ -65,8 +69,12 @@ class TestData():
             self.asar.append(asar_agulhas)
         if ncep_agulhas:
             self.ncep4asar.append(ncep_agulhas)
-        if not self.asar:
-            self.noData = True
+        if 'rs2' in globals():
+            self.radarsat2.append(rs2)
+        if self.asar:
+            self.noData = False
+        if self.radarsat2:
+            self.noData = False
 
     def __del__(self):
         '''
