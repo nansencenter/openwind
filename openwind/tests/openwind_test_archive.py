@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:12.06.2014 14:43
+# Last modified:12.06.2014 15:58
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -72,6 +72,8 @@ class TestData():
         # check for data from local archives
         if 'rs2' in globals() and rs2:
             self.radarsat2.append(rs2)
+        if 'rs2_quad' in globals() and rs2_quad:
+            self.radarsat2.append(rs2_quad)
         if self.asar:
             self.noData = False
         if self.radarsat2:
