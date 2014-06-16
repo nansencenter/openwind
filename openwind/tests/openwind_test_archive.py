@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:16.06.2014 12:27
+# Last modified:16.06.2014 12:46
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -85,8 +85,6 @@ class TestData(object):
             Delete any downloaded files
         '''
         super(TestData, self).exit()
-        import pdb
-        pdb.set_trace()
         if os.path.isfile(asar_agulhas):
             os.unlink(asar_agulhas)
         if os.path.isfile(ncep_agulhas):
