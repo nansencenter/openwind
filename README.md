@@ -6,6 +6,7 @@ OpenWind depends on Nansat (https://github.com/nansencenter/nansat).
 
 - Add the top level folder openwind/ to your PYTHONPATH
 - Add the subfolder openwind/openwind/ to your PATH (for command line usage)
+- Test the installation by running the test script (test_sarwind.py) in openwind/tests
 
 # Command line usage:
 
