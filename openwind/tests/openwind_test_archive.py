@@ -7,28 +7,27 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:12.06.2014 15:58
+# Last modified:16.06.2014 12:27
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
 import os
-
-path = os.path.dirname(__file__)
+from test_sarwind import dirname
 
 '''
     Online datasets
 '''
 asar_agulhas_url = 'ftp://ftp.nersc.no/pub/python_test_data/asar/ASA_WSM_1PNPDE20120327_205532_000002143113_00100_52700_6903.N1'
 fname = os.path.basename(asar_agulhas_url)
-if not os.path.exists(os.path.join(path,fname)):
-    os.system('curl -so ' + os.path.join(path,fname) + ' ' + asar_agulhas_url )
-asar_agulhas = os.path.join(path,fname)
+if not os.path.exists(os.path.join(dirname,fname)):
+    os.system('curl -so ' + os.path.join(dirname,fname) + ' ' + asar_agulhas_url )
+asar_agulhas = os.path.join(dirname,fname)
 
 ncep_agulhas_url = 'ftp://ftp.nersc.no/pub/python_test_data/ncep/gfs/gfs20120328/gfs.t00z.master.grbf00'
 fname = os.path.basename(ncep_agulhas_url)
-if not os.path.exists(os.path.join(path,fname)):
-    os.system('curl -so ' + os.path.join(path,fname) + ' ' + ncep_agulhas_url )
-ncep_agulhas = os.path.join(path,fname)
+if not os.path.exists(os.path.join(dirname,fname)):
+    os.system('curl -so ' + os.path.join(dirname,fname) + ' ' + ncep_agulhas_url )
+ncep_agulhas = os.path.join(dirname,fname)
 
 
 '''
@@ -52,12 +51,14 @@ except IOError as e:
 if not os.path.isfile(asar_agulhas) or not os.path.isfile(ncep_agulhas):
     asar_agulhas = None
     ncep_agulhas = None
+    print "Could not access ftp-site with test data"
+
 
 '''
     Test data should be contained in an instance of the TestData class so we're
     able to correctly remove downloaded files after the tests
 '''
-class TestData():
+class TestData(object):
     asar = []
     radarsat2 = []
     ncep4asar = []
@@ -79,16 +80,19 @@ class TestData():
         if self.radarsat2:
             self.noData = False
 
-    def __del__(self):
+    def __exit__(self):
         '''
             Delete any downloaded files
         '''
-        for a in self.asar:
-            if os.path.isfile(a):
-                os.unlink(a)
-        for n in self.ncep4asar:
-            if os.path.isfile(n):
-                os.unlink(n)
+        super(TestData, self).exit()
+        import pdb
+        pdb.set_trace()
+        if os.path.isfile(asar_agulhas):
+            os.unlink(asar_agulhas)
+        if os.path.isfile(ncep_agulhas):
+            os.unlink(ncep_agulhas)
+
         self.asar = []
         self.ncep4asar = []
+        self.radarsat2 = []
         self.noData = True
