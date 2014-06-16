@@ -7,14 +7,14 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:16.06.2014 09:09
+# Last modified:16.06.2014 09:46
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
 import os
 path = os.path.dirname(__file__)
 
-# A Radarsat-2 file:
+# Radarsat-2 file:
 rs2 = '/Volumes/sat_downloads_radarsat2/RS2_20140326_054601_0076_SCWA_HHHV_SGF_316922_8221_9516957.zip'
 try:
     with open(rs2) as f:

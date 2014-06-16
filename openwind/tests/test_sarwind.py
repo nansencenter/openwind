@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:12.06.2014 13:54
+# Last modified:16.06.2014 10:01
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -35,11 +35,14 @@ class SARWindTest(unittest.TestCase):
     def test_sarwind_using_default(self):
         for i in range(len(test_data.radarsat2)):
             w = SARWind(test_data.radarsat2[i])
+            if i==0: # quadpol (2nd file) is not yet working correctly
+                w.plot(filename='rs2_test_plot.png', show=False)
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_filenames(self):
         for i in range(len(test_data.asar)):
             w = SARWind(test_data.asar[i], wind_direction=test_data.ncep4asar[i])
+            w.plot(filename='asar_agulhas_test_plot.png', show=False)
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_filename_ncep_nansat(self):
