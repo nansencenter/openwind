@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:16.06.2014 12:46
+# Last modified:27.06.2014 10:53
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -80,11 +80,10 @@ class TestData(object):
         if self.radarsat2:
             self.noData = False
 
-    def __exit__(self):
+    def __del__(self):
         '''
             Delete any downloaded files
         '''
-        super(TestData, self).exit()
         if os.path.isfile(asar_agulhas):
             os.unlink(asar_agulhas)
         if os.path.isfile(ncep_agulhas):
@@ -94,3 +93,4 @@ class TestData(object):
         self.ncep4asar = []
         self.radarsat2 = []
         self.noData = True
+        super(TestData, self).exit()
