@@ -61,6 +61,11 @@ available.
 
 # References
 
+Mouche A.A., Collard F., Chapron B., Dagestad K.-F., Guitton G., Johannessen
+J.A., Kerbaol V., Hansen M.W. (2012). On the use of Doppler shift for sea
+surface wind retrieval from SAR. IEEE Transactions on Geoscience and Remote
+Sensing, Vol. 50, No. 7, pp 2901-2909, doi:10.1109/TGRS.2011.2174998.
+
 Hersbach, H., Comparison of C-Band Scatterometer CMOD5.N Equivalent Neutral
 Winds with ECMWF J. Atm. Oceanic Technol., 2010, 27, 721-736,
 doi:10.1175/2009JTECHO698.1.
