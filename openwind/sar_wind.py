@@ -6,6 +6,7 @@
 #               modify under the terms of GNU General Public License, v.3
 #               http://www.gnu.org/licenses/gpl-3.0.html
 
+from __future__ import absolute_import
 
 import argparse
 import warnings
@@ -19,8 +20,9 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
-from nansat import Nansat, Nansatmap, Domain
-from cmod5n import cmod5n_inverse
+from nansat.nansat import Nansat, Domain
+from nansat.nansatmap import Nansatmap
+from openwind.cmod5n import cmod5n_inverse
 
 class SARWind(Nansat, object):
     '''
@@ -28,7 +30,7 @@ class SARWind(Nansat, object):
     '''
 
     def __init__(self, sar_image, wind_direction='ncep_wind_online', 
-                    pixelsize=500, eResampleAlg=1):
+                    pixelsize=500, eResampleAlg=1, *args, **kwargs):
         '''
             Parameters
             -----------
@@ -46,12 +48,23 @@ class SARWind(Nansat, object):
                           file (online or on local disk) matching the SAR
                           image time [DEFAULT: 'ncep_wind_online']
                         - a Nansat object with wind direction.
+            pixel_size : float or int
+                        Grid pixel size in metres
+            eResampleAlg : int
+                        Resampling algorithm used for reprojecting wind field
+                        to SAR image
+                            -1 : Average,
+                             0 : NearestNeighbour
+                             1 : Bilinear (default),
+                             2 : Cubic,
+                             3 : CubicSpline,
+                             4 : Lancoz
 
         '''
         if isinstance(sar_image, str) or isinstance(sar_image, unicode):
-            super(SARWind, self).__init__(sar_image)
+            super(SARWind, self).__init__(sar_image, *args, **kwargs)
         elif isinstance(sar_image, Nansat):
-            super(SARWind, self).__init__(domain=sar_image)
+            super(SARWind, self).__init__(domain=sar_image, *args, **kwargs)
             self.vrt = sar_image.vrt
 
         # Check that this is a SAR image with VV pol NRCS
@@ -76,7 +89,7 @@ class SARWind(Nansat, object):
     def _get_aux_wind_from_str(self, aux_wind_source):
         
         try:
-            # If a complete filename of wind dir source is given
+            # If a complete filename of wind direction source is given
             aux_wind = Nansat(aux_wind_source)
         except:
             # If only mapper name is given, we add the SAR image
@@ -105,7 +118,7 @@ class SARWind(Nansat, object):
 
         wind_direction_time = aux_wind.get_time()[0]
 
-        # Bi-linear interpolation onto SAR image
+        # Interpolation onto SAR image
         aux_wind.reproject(self, eResampleAlg=eResampleAlg)
 
         # Check time difference between SAR image and wind direction object

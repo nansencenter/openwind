@@ -2,29 +2,32 @@
 # coding=utf-8
 #-------------------------------------------------------------------------------
 # Name:		cdop.py
-# Purpose:      Empirical gmf to estimate the Doppler shift at C-band given a
-#               wind field, the radar incidence angle and the radar transmit
-#               and receive polarizations (VV or HH).
+# Purpose:      CDOP gmf to estimate the Doppler shift at C-band 
 #
 # Author:       Alexis Mouche
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	03.07.2014
-# Last modified:03.07.2014 09:41
+# Last modified:03.07.2014 11:29
 # Copyright:    (c) Ifremer
 # License:      GNU General Public License, v.3
 #               http://www.gnu.org/licenses/gpl-3.0.html
 #-------------------------------------------------------------------------------
 
-'''
-    This code contains the CDOP empirical model function, and is based on the
-    following paper:
+''' 
+    This code contains the empirical CDOP geophysical model function, and is
+    based on the following paper:
     
     Mouche A.A., Collard F., Chapron B., Dagestad K.-F., Guitton G.,
     Johannessen J.A., Kerbaol V., Hansen M.W. (2012). On the use of Doppler
     shift for sea surface wind retrieval from SAR. IEEE Transactions on
     Geoscience and Remote Sensing, Vol. 50, No. 7, pp 2901-2909,
     DOI:10.1109/TGRS.2011.2174998.
+
+    CDOP estimates the Doppler shift at C-band given a wind field, the radar
+    incidence angle and the radar transmit and receive polarizations (VV or
+    HH).
+
 '''
 import numpy as np
 
@@ -36,8 +39,23 @@ def cdop_func(x):
 
 
 def cdop(u10, phi, inc, pol):
-    """
-    """
+    '''
+        Input
+        -----------
+        u10 : float, numpy.array
+              wind speed in m/s
+        phi : float, numpy.array
+              wind direction relative to SAR look direction
+        inc : float, numpy.array
+              SAR incidence angle
+        pol : string
+              SAR polarization (VV or HH)
+
+        Return
+        -----------
+        dop : numpy.array
+              Estimated Doppler shift [Hz]
+    '''
     # Check inputs
     sizes = np.array([np.size(inc), np.size(u10), np.size(phi)])
     size = sizes.max()
