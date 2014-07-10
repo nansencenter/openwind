@@ -29,7 +29,7 @@ class SARWind(Nansat, object):
     A class for calculating wind speed from SAR images using CMOD
     '''
 
-    def __init__(self, sar_image, wind_direction='ncep_wind_online', 
+    def __init__(self, sar_image, wind_direction='ncep_wind_online',
                     pixelsize=500, eResampleAlg=1, *args, **kwargs):
         '''
             Parameters
@@ -87,7 +87,7 @@ class SARWind(Nansat, object):
         self.calculate_wind(wind_direction,eResampleAlg=eResampleAlg)
 
     def _get_aux_wind_from_str(self, aux_wind_source):
-        
+
         try:
             # If a complete filename of wind direction source is given
             aux_wind = Nansat(aux_wind_source)
@@ -153,7 +153,7 @@ class SARWind(Nansat, object):
         return np.degrees(np.arctan2(-u_array, -v_array)), \
                 wind_direction_time, aux_wind['windspeed']
 
-    def calculate_wind(self, wind_direction='ncep_wind_online', 
+    def calculate_wind(self, wind_direction='ncep_wind_online',
                         storeModelSpeed=True, eResampleAlg=1):
         '''
             Calculate wind speed from SAR sigma0 in VV polarization
@@ -230,6 +230,9 @@ class SARWind(Nansat, object):
                             'time': wind_direction_time,
         })
 
+        # set winddir_time to global metadata
+        self.set_metadata('winddir_time', str(wind_direction_time))
+
     def _get_masked_windspeed(self, landmask=True, icemask=True):
         try:
             sar_windspeed = self['windspeed']
@@ -279,7 +282,7 @@ class SARWind(Nansat, object):
 
 
 
-    def plot(self, filename=None, numVectorsX = 16, show=True, 
+    def plot(self, filename=None, numVectorsX = 16, show=True,
             clim=[0,20], maskWindAbove=35,
             windspeedBand='windspeed', winddirBand='winddirection',
             northUp_eastRight=True, landmask=True, icemask=True):
@@ -308,7 +311,7 @@ class SARWind(Nansat, object):
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(wind_direction) before plotting.')
         sar_windspeed[sar_windspeed>maskWindAbove] = np.nan
- 
+
         winddirReductionFactor = np.round(
                 self.vrt.dataset.RasterXSize/numVectorsX)
 
