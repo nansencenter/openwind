@@ -7,19 +7,19 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:08.07.2014 14:01
+# Last modified:08.07.2014 15:52
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
 import unittest
 import filecmp
-import os
+import os, sys
 import numpy as np
 
-from openwind import *
-from nansat import *
+from openwind import SARWind
+from nansat.nansat import Nansat, Domain
 
-import openwind_test_archive as ota
+import openwind.tests.openwind_test_archive as ota
 
 dirname_test_plots = os.path.join(
                         os.path.dirname(os.path.abspath(__file__)), 'plots')
@@ -39,11 +39,17 @@ class SARWindTest(unittest.TestCase):
             raise ValueError('No test data available')
 
     def test_sarwind_using_default(self):
+        if len(self.test_data.radarsat2)==0:
+            raise IOError('No Radarsat-2 data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         for i in range(len(self.test_data.radarsat2)):
             w = SARWind(self.test_data.radarsat2[i])
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_filenames(self):
+        if len(self.test_data.asar)==0:
+            raise IOError('No ASAR data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         for i in range(len(self.test_data.asar)):
             w = SARWind(self.test_data.asar[i],
                     wind_direction=self.test_data.ncep4asar[i])
@@ -51,18 +57,27 @@ class SARWindTest(unittest.TestCase):
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_filename_ncep_nansat(self):
+        if len(self.test_data.asar)==0:
+            raise IOError('No ASAR data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         for i in range(len(self.test_data.asar)):
             mw = Nansat(self.test_data.ncep4asar[i])
             w = SARWind(self.test_data.asar[i], wind_direction=mw)
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_nansat_ncep_filename(self):
+        if len(self.test_data.asar)==0:
+            raise IOError('No ASAR data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         for i in range(len(self.test_data.asar)):
             asar = Nansat(self.test_data.asar[i])
             w = SARWind(asar, wind_direction=self.test_data.ncep4asar[i])
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_nansat_ncep_nansat(self):
+        if len(self.test_data.asar)==0:
+            raise IOError('No ASAR data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         for i in range(len(self.test_data.asar)):
             asar = Nansat(self.test_data.asar[i])
             mw = Nansat(self.test_data.ncep4asar[i])
@@ -70,12 +85,12 @@ class SARWindTest(unittest.TestCase):
             self.assertIsInstance(w, SARWind)
 
     def test_nansat_reproject(self):
+        if len(self.test_data.asar)==0:
+            raise IOError('No ASAR data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         asar = Nansat(self.test_data.asar[0])
-        #asar.resize(pixelsize=500, eResampleAlg=1)
-        asar.resize(0.01)
+        asar.resize(pixelsize=500, eResampleAlg=1)
         mw = Nansat(self.test_data.ncep4asar[0])
-        import pdb
-        pdb.set_trace()
         mw.reproject(asar, eResampleAlg=1)
         self.assertIsInstance(mw[1], np.ndarray)
 
@@ -86,6 +101,9 @@ class SARWindTest(unittest.TestCase):
 
         If adding more test plots, please make sure the indices are correct
         '''
+        if len(self.test_data.asar)==0:
+            raise IOError('No ASAR data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         w = SARWind(self.test_data.asar[0],
                 wind_direction=self.test_data.ncep4asar[0])
         w.plot(filename=os.path.join(dirname_test_plots,
@@ -95,6 +113,9 @@ class SARWindTest(unittest.TestCase):
             os.path.join(dirname_test_plots,'agulhas_test_plot_ref.png')))
 
     def test_plot_barents(self):
+        if len(self.test_data.radarsat2)==0:
+            raise IOError('No Radarsat-2 data - try adding some as ' \
+                    'described in templates/openwind_local_archive.py' )
         w = SARWind(self.test_data.radarsat2[0])
         w.plot(filename=os.path.join(dirname_test_plots,
             'rs2_barents_test_plot.png'), show=False)
@@ -110,8 +131,6 @@ class SARWindTest(unittest.TestCase):
         if os.path.exists( os.path.join( dirname_test_plots,
                 'rs2_barents_test_plot.png' ) ):
             os.unlink(os.path.join(dirname_test_plots,'rs2_barents_test_plot.png'))
-        ## Remove downloaded test data
-        #self.test_data.delete_downloaded()
 
 
 if __name__=='__main__':
