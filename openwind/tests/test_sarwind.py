@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:08.07.2014 15:52
+# Last modified:14.07.2014 13:27
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -53,7 +53,6 @@ class SARWindTest(unittest.TestCase):
         for i in range(len(self.test_data.asar)):
             w = SARWind(self.test_data.asar[i],
                     wind_direction=self.test_data.ncep4asar[i])
-            w.plot(filename='asar_agulhas_test_plot.png', show=False)
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_filename_ncep_nansat(self):
