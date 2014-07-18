@@ -118,8 +118,7 @@ class Mapper(VRT, object):
         ######################################################
         # Open downloaded grib file with a(ny) Nansat mapper
         ######################################################
-        # baaaad solution!
-        from nansat import Nansat
+        from nansat.nansat import Nansat
         w = Nansat(outFileName)
         VRT.__init__(self, vrtDataset=w.vrt.dataset)
 
