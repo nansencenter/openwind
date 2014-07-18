@@ -124,12 +124,13 @@ class SARWindTest(unittest.TestCase):
         w = SARWind(self.test_data.asar[0],
                 wind_direction=self.test_data.ncep4asar[0])
         w.plot(filename=os.path.join(dirname_test_plots,
-            'agulhas_test_plot.png'), show=False)
+            'agulhas_test_plot.png'), show=False, landmask=False)
+
         if sys.version_info < (2, 7):
             self.assertTrue(filecmp.cmp(
                 os.path.join(dirname_test_plots,'agulhas_test_plot.png'),
                 os.path.join(dirname_test_plots,'agulhas_test_plot_ref.png'))
-                in [False])
+                in [True])
         else:
             self.assertTrue(filecmp.cmp(
                 os.path.join(dirname_test_plots,'agulhas_test_plot.png'),
@@ -141,12 +142,12 @@ class SARWindTest(unittest.TestCase):
                     'described in templates/openwind_local_archive.py' )
         w = SARWind(self.test_data.radarsat2[0])
         w.plot(filename=os.path.join(dirname_test_plots,
-            'rs2_barents_test_plot.png'), show=False)
+            'rs2_barents_test_plot.png'), show=False, landmask=False)
         if sys.version_info < (2, 7):
             self.assertTrue(filecmp.cmp(
                 os.path.join(dirname_test_plots, 'rs2_barents_test_plot.png'),
                 os.path.join(dirname_test_plots, 'rs2_barents_test_plot_ref.png'))
-                in [False])
+                in [True])
         else:
             self.assertTrue(filecmp.cmp(
                 os.path.join(dirname_test_plots,'rs2_barents_test_plot.png'),
@@ -157,6 +158,7 @@ class SARWindTest(unittest.TestCase):
         if os.path.exists( os.path.join( dirname_test_plots,
                 'agulhas_test_plot.png' ) ):
             os.unlink(os.path.join(dirname_test_plots,'agulhas_test_plot.png'))
+
         if os.path.exists( os.path.join( dirname_test_plots,
                 'rs2_barents_test_plot.png' ) ):
             os.unlink(os.path.join(dirname_test_plots,'rs2_barents_test_plot.png'))
