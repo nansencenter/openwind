@@ -66,6 +66,7 @@ class SARWind(Nansat, object):
         elif isinstance(sar_image, Nansat):
             super(SARWind, self).__init__(domain=sar_image, *args, **kwargs)
             self.vrt = sar_image.vrt
+            self.mapper = sar_image.mapper
 
         # Check that this is a SAR image with VV pol NRCS
         try:
@@ -104,7 +105,7 @@ class SARWind(Nansat, object):
         '''
             Check and return the provided array of wind directions
         '''
-        if not wind_directions.shape()==self.shape():
+        if not wind_directions.shape == self.shape():
             raise RuntimeError('The provided wind direction array ' \
                         'must have the same shape as the SAR NRCS')
         return wind_directions
