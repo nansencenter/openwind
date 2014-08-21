@@ -1,0 +1,3 @@
+This is a namespace package for nansat mappers specific to openwind. It was
+created to contain the ``ncep online wind'' mapper which is now in the nansat
+package. Anyway, openwind specific mappers can also be added here...
