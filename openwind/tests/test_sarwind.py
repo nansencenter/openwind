@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-------------------------------------------------------------------------------
 # Name:		test_sarwind.py
-# Purpose:      
+# Purpose:
 #
 # Author:       Morten Wergeland Hansen
 # Modified:	Morten Wergeland Hansen
@@ -9,7 +9,7 @@
 # Created:	26.05.2014
 # Last modified:14.07.2014 13:27
 # Copyright:    (c) NERSC
-# License:      
+# License:
 #-------------------------------------------------------------------------------
 import unittest
 import filecmp
@@ -44,6 +44,9 @@ class SARWindTest(unittest.TestCase):
                     'described in templates/openwind_local_archive.py' )
         for i in range(len(self.test_data.radarsat2)):
             w = SARWind(self.test_data.radarsat2[i])
+        if sys.version_info < (2, 7):
+            type(w) == SARWind
+        else:
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_filenames(self):
@@ -53,6 +56,9 @@ class SARWindTest(unittest.TestCase):
         for i in range(len(self.test_data.asar)):
             w = SARWind(self.test_data.asar[i],
                     wind_direction=self.test_data.ncep4asar[i])
+        if sys.version_info < (2, 7):
+            type(w) == SARWind
+        else:
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_filename_ncep_nansat(self):
@@ -62,6 +68,9 @@ class SARWindTest(unittest.TestCase):
         for i in range(len(self.test_data.asar)):
             mw = Nansat(self.test_data.ncep4asar[i])
             w = SARWind(self.test_data.asar[i], wind_direction=mw)
+        if sys.version_info < (2, 7):
+            type(w) == SARWind
+        else:
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_nansat_ncep_filename(self):
@@ -71,6 +80,9 @@ class SARWindTest(unittest.TestCase):
         for i in range(len(self.test_data.asar)):
             asar = Nansat(self.test_data.asar[i])
             w = SARWind(asar, wind_direction=self.test_data.ncep4asar[i])
+        if sys.version_info < (2, 7):
+            type(w) == SARWind
+        else:
             self.assertIsInstance(w, SARWind)
 
     def test_sarwind_using_asar_nansat_ncep_nansat(self):
@@ -81,6 +93,9 @@ class SARWindTest(unittest.TestCase):
             asar = Nansat(self.test_data.asar[i])
             mw = Nansat(self.test_data.ncep4asar[i])
             w = SARWind(asar, wind_direction=mw)
+        if sys.version_info < (2, 7):
+            type(w) == SARWind
+        else:
             self.assertIsInstance(w, SARWind)
 
     def test_nansat_reproject(self):
@@ -91,7 +106,10 @@ class SARWindTest(unittest.TestCase):
         asar.resize(pixelsize=500, eResampleAlg=1)
         mw = Nansat(self.test_data.ncep4asar[0])
         mw.reproject(asar, eResampleAlg=1)
-        self.assertIsInstance(mw[1], np.ndarray)
+        if sys.version_info < (2, 7):
+            type(mw[1]) == np.ndarray
+        else:
+            self.assertIsInstance(mw[1], np.ndarray)
 
     def test_plot_agulhas(self):
         '''
@@ -106,10 +124,17 @@ class SARWindTest(unittest.TestCase):
         w = SARWind(self.test_data.asar[0],
                 wind_direction=self.test_data.ncep4asar[0])
         w.plot(filename=os.path.join(dirname_test_plots,
-            'agulhas_test_plot.png'), show=False)
-        self.assertTrue(filecmp.cmp(
-            os.path.join(dirname_test_plots,'agulhas_test_plot.png'),
-            os.path.join(dirname_test_plots,'agulhas_test_plot_ref.png')))
+            'agulhas_test_plot.png'), show=False, landmask=False)
+
+        if sys.version_info < (2, 7):
+            self.assertTrue(filecmp.cmp(
+                os.path.join(dirname_test_plots,'agulhas_test_plot.png'),
+                os.path.join(dirname_test_plots,'agulhas_test_plot_ref.png'))
+                in [True])
+        else:
+            self.assertTrue(filecmp.cmp(
+                os.path.join(dirname_test_plots,'agulhas_test_plot.png'),
+                os.path.join(dirname_test_plots,'agulhas_test_plot_ref.png')))
 
     def test_plot_barents(self):
         if len(self.test_data.radarsat2)==0:
@@ -117,16 +142,23 @@ class SARWindTest(unittest.TestCase):
                     'described in templates/openwind_local_archive.py' )
         w = SARWind(self.test_data.radarsat2[0])
         w.plot(filename=os.path.join(dirname_test_plots,
-            'rs2_barents_test_plot.png'), show=False)
-        self.assertTrue(filecmp.cmp(
-            os.path.join(dirname_test_plots,'rs2_barents_test_plot.png'),
-            os.path.join(dirname_test_plots,'rs2_barents_test_plot_ref.png')))
+            'rs2_barents_test_plot.png'), show=False, landmask=False)
+        if sys.version_info < (2, 7):
+            self.assertTrue(filecmp.cmp(
+                os.path.join(dirname_test_plots, 'rs2_barents_test_plot.png'),
+                os.path.join(dirname_test_plots, 'rs2_barents_test_plot_ref.png'))
+                in [True])
+        else:
+            self.assertTrue(filecmp.cmp(
+                os.path.join(dirname_test_plots,'rs2_barents_test_plot.png'),
+                os.path.join(dirname_test_plots,'rs2_barents_test_plot_ref.png')))
 
     def tearDown(self):
         # Delete test plots
         if os.path.exists( os.path.join( dirname_test_plots,
                 'agulhas_test_plot.png' ) ):
             os.unlink(os.path.join(dirname_test_plots,'agulhas_test_plot.png'))
+
         if os.path.exists( os.path.join( dirname_test_plots,
                 'rs2_barents_test_plot.png' ) ):
             os.unlink(os.path.join(dirname_test_plots,'rs2_barents_test_plot.png'))
