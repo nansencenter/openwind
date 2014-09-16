@@ -20,7 +20,7 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
-from nansat.nansat import Nansat, Domain
+from nansat.nansat import Nansat, Domain, import_mappers
 from nansat.nansatmap import Nansatmap
 from openwind.cmod5n import cmod5n_inverse
 
@@ -80,12 +80,59 @@ class SARWind(Nansat, object):
 
         self.SAR_image_time = self.get_time(
                 self.sigma0_bandNo).replace(tzinfo=None)
+        self._set_wind_direction_source(wind_direction)
 
         if pixelsize != 'fullres':
             print 'Resizing SAR image to ' + str(pixelsize) + ' m pixel size'
             self.resize(pixelsize=pixelsize)
 
         self.calculate_wind(wind_direction,eResampleAlg=eResampleAlg)
+
+    def _set_wind_direction_source(self, wind_direction):
+        '''
+            Adds wind direction source information to metadata
+
+            Parameters
+            -----------
+            wind_direction : int, numpy array, string, Nansat
+                        Auxiliary wind field information needed to calculate
+                        SAR wind (must be or have wind direction in degrees):
+
+                        - constant wind direction (integer),
+                        - array of wind directions, same size as the SAR data,
+                        - the name of a Nansat compatible file containing
+                          wind direction information
+                        - name of a mapper with functionality to find a wind
+                          file (online or on local disk) matching the SAR
+                          image time [DEFAULT: 'ncep_wind_online']
+                        - a Nansat object with wind direction.
+        '''
+
+        if isinstance(wind_direction, str):
+            nansat_mappers = import_mappers()
+            mnames = [key.replace('mapper_','') for key in nansat_mappers]
+            if wind_direction in mnames:
+                self.set_metadata('WIND_DIRECTION_SOURCE', 
+                    wind_direction + datetime.strftime(
+                                    self.SAR_image_time, ':%Y%m%d%H%M'))
+            else:
+                self.set_metadata('WIND_DIRECTION_SOURCE',
+                    wind_direction)
+        elif isinstance(wind_direction,Nansat):
+            self.set_metadata('WIND_DIRECTION_SOURCE',
+                    'Nansat instance of '+wind_direction.fileName)
+        elif isinstance(wind_direction, int):
+            self.set_metadata('WIND_DIRECTION_SOURCE',
+                    'Set by user ('+str(wind_direction)+')')
+        elif isinstance(wind_direction, np.ndarray):
+            wind_direction_array = self._check_wind_direction_array_dims(
+                    wind_direction )
+            self.set_metadata('WIND_DIRECTION_SOURCE',
+                    'numpy.ndarray')
+
+    def get_source_wind(self):
+        ''' Returns metadata information about the source wind direction '''
+        return self.get_metadata('WIND_DIRECTION_SOURCE')
 
     def _get_aux_wind_from_str(self, aux_wind_source):
 
@@ -160,6 +207,8 @@ class SARWind(Nansat, object):
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
 
+        # following checks should be simplified using 'WIND_DIRECTION_SOURCE'
+        # metadata
         if isinstance(wind_direction, str):
             wind_direction_array, wind_direction_time, model_windspeed = \
                     self._get_wind_direction_array(
