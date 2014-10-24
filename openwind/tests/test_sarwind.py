@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:14.07.2014 13:27
+# Last modified:24.10.2014 16:52
 # Copyright:    (c) NERSC
 # License:
 #-------------------------------------------------------------------------------
@@ -15,6 +15,8 @@ import unittest
 import filecmp
 import os, sys
 import numpy as np
+
+from warnings import warn
 
 from openwind import SARWind
 from nansat.nansat import Nansat, Domain
@@ -31,6 +33,9 @@ This test suite does not test command line usage. See
 http://hg.python.org/cpython/file/default/Lib/test/test_cmd_line_script.py for
 several examples of how to test handling of command line arguments.
 '''
+
+warn('Tests may not work if run from inside OpenWind root folder. The ' \
+        'reason is unclear...')
 
 class SARWindTest(unittest.TestCase):
     def setUp(self):
@@ -166,3 +171,5 @@ class SARWindTest(unittest.TestCase):
 
 if __name__=='__main__':
     unittest.main()
+    warn('Openwind may not work if run from inside its root folder. The ' \
+        'reason is unclear but seems related to Nansat reprojection...')
