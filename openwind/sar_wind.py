@@ -202,8 +202,8 @@ class SARWind(Nansat, object):
         u_array = aux_wind[wind_u_bandNo]
         v_array = aux_wind[wind_v_bandNo]
         # 0 degrees meaning wind from North, 90 degrees meaning wind from East
-        if not u_array:
-            raise Error('Could not read wind vectors')
+        if u_array==None:
+            raise Exception('Could not read wind vectors')
         return np.degrees(np.arctan2(-u_array, -v_array)), \
                 wind_direction_time, aux_wind['windspeed']
 
