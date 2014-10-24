@@ -20,7 +20,7 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
-from nansat.nansat import Nansat, Domain, import_mappers
+from nansat.nansat import Nansat, Domain, _import_mappers
 from nansat.nansatmap import Nansatmap
 from openwind.cmod5n import cmod5n_inverse
 
@@ -86,7 +86,11 @@ class SARWind(Nansat, object):
             print 'Resizing SAR image to ' + str(pixelsize) + ' m pixel size'
             self.resize(pixelsize=pixelsize)
 
-        self.calculate_wind(wind_direction,eResampleAlg=eResampleAlg)
+        # If this is a netcdf file with already calculated windspeed (e.g.
+        # created as a SARWind object in order to use the plotting functions),
+        # do not calculate wind over again
+        if not self.has_band('windspeed'):
+            self.calculate_wind(wind_direction,eResampleAlg=eResampleAlg)
 
     def _set_wind_direction_source(self, wind_direction):
         '''
@@ -109,8 +113,8 @@ class SARWind(Nansat, object):
         '''
 
         if isinstance(wind_direction, str):
-            nansat_mappers = import_mappers()
-            mnames = [key.replace('mapper_','') for key in nansat_mappers]
+            import nansat.nansat
+            mnames = [key.replace('mapper_','') for key in nansat.nansat.nansatMappers]
             if wind_direction in mnames:
                 self.set_metadata('WIND_DIRECTION_SOURCE', 
                     wind_direction + datetime.strftime(
@@ -283,9 +287,10 @@ class SARWind(Nansat, object):
         # set winddir_time to global metadata
         self.set_metadata('winddir_time', str(wind_direction_time))
 
-    def _get_masked_windspeed(self, landmask=True, icemask=True):
+    def _get_masked_windspeed(self, landmask=True, icemask=True,
+            windspeedBand='windspeed'):
         try:
-            sar_windspeed = self['windspeed']
+            sar_windspeed = self[windspeedBand]
         except:
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(wind_direction) first.')
@@ -356,7 +361,8 @@ class SARWind(Nansat, object):
         '''
 
         try:
-            sar_windspeed, palette = self._get_masked_windspeed(landmask, icemask)
+            sar_windspeed, palette = self._get_masked_windspeed(landmask,
+                    icemask, windspeedBand=windspeedBand)
         except:
             raise ValueError('SAR wind has not been calculated, ' \
                 'execute calculate_wind(wind_direction) before plotting.')
@@ -437,9 +443,14 @@ class SARWind(Nansat, object):
                       'label':None,
                       'labelpos':'E', 'coordinates':'figure',
                       'fontproperties':None, 'width':None}
+        popKeys = []
         for iKey in quiverArgs:
             if 'quiver_' + iKey in kwargs.keys():
                 quiverArgs[iKey] = kwargs.pop('quiver_'+iKey)
+            else:
+                popKeys.append(iKey)
+        for key in popKeys:
+            quiverArgs.pop(key)
 
         nMap = Nansatmap(self, resolution='l',figsize=(5, 8))
 
