@@ -374,7 +374,7 @@ class SARWind(Nansat, object):
                 self.vrt.dataset.RasterXSize/numVectorsX)
 
         winddir_relative_up = 360 - self[winddirBand] + \
-                                    self.azimuth_up()
+                                    self.azimuth_y()
         indX = range(0, self.vrt.dataset.RasterXSize, winddirReductionFactor)
         indY = range(0, self.vrt.dataset.RasterYSize, winddirReductionFactor)
         X, Y = np.meshgrid(indX, indY)
