@@ -6,20 +6,12 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	19.11.2014
-# Last modified:20.11.2014 09:21
+# Last modified:20.11.2014 15:42
 # Copyright:    (c) NERSC
 # License:      GNU General Public License
 #-------------------------------------------------------------------------------
 import sys
 import os
-
-import_error_msg = "OpenWind requires %s, which should be installed separately"
-
-# Check if required packages are installed
-try:
-    import nansat
-except ImportError:
-    raise ImportError(import_error_msg %'nansat')
 
 NAME                = 'openwind'
 MAINTAINER          = "Nansat and OpenWind Developers"
@@ -40,6 +32,14 @@ PLATFORMS           = ["UNKNOWN"]
 ISRELEASED          = False
 VERSION             = '%d.%d.%d' % (MAJOR, MINOR, MICRO) 
 REQS                = []
+
+import_error_msg = "OpenWind v%d.%d.%d requires %s, which should be installed separately"
+
+# Check if required packages are installed
+try:
+    import nansat
+except ImportError:
+    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6')
 
 #----------------------------------------------------------------------------#
 #                               Install package
