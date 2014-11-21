@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:24.10.2014 16:52
+# Last modified:21.11.2014 13:59
 # Copyright:    (c) NERSC
 # License:
 #-------------------------------------------------------------------------------
@@ -131,6 +131,8 @@ class SARWindTest(unittest.TestCase):
         w.plot(filename=os.path.join(dirname_test_plots,
             'agulhas_test_plot.png'), show=False, landmask=False)
 
+        import ipdb
+        ipdb.set_trace()
         if sys.version_info < (2, 7):
             self.assertTrue(filecmp.cmp(
                 os.path.join(dirname_test_plots,'agulhas_test_plot.png'),
