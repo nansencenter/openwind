@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	19.11.2014
-# Last modified:20.11.2014 15:42
+# Last modified:21.11.2014 14:38
 # Copyright:    (c) NERSC
 # License:      GNU General Public License
 #-------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ import_error_msg = "OpenWind v%d.%d.%d requires %s, which should be installed se
 try:
     import nansat
 except ImportError:
-    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6')
+    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6'))
 
 #----------------------------------------------------------------------------#
 #                               Install package
@@ -101,9 +101,6 @@ else:
 
 def run_setup():
     kw = dict()
-
-    import pdb
-    pdb.set_trace()
 
     setup(
         name=NAME,
