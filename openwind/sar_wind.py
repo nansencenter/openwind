@@ -171,7 +171,7 @@ class SARWind(Nansat, object):
         wind_direction_time = aux_wind.get_time()[0]
 
         # Interpolation onto SAR image
-        aux_wind.reproject(self, eResampleAlg=eResampleAlg)
+        aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
 
         # Check time difference between SAR image and wind direction object
         timediff = self.SAR_image_time - wind_direction_time
@@ -303,7 +303,7 @@ class SARWind(Nansat, object):
         if landmask:
             try: # Land mask
                 sar_windspeed = np.ma.masked_where(
-                                    self.watermask()[1]==2, sar_windspeed)
+                                    self.watermask(tps=True)[1]==2, sar_windspeed)
                 palette.set_bad([.3, .3, .3], 1.0) # Land is masked (bad)
             except:
                 print 'Land mask not available'
@@ -317,7 +317,7 @@ class SARWind(Nansat, object):
                 except: # otherwise Thredds
                     ice = Nansat('metno_hires_seaice:' +
                             self.SAR_image_time.strftime('%Y%m%d'))
-                ice.reproject(self)
+                ice.reproject(self, tps=True)
                 iceBandNo = ice._get_band_number(
                     {'standard_name': 'sea_ice_area_fraction'})
                 sar_windspeed[ice[iceBandNo]>0] = -1
@@ -469,7 +469,7 @@ class SARWind(Nansat, object):
         nMap.pcolormesh(windspeedPcolor, **pcolormeshArgs)
 
         # apply landmask to windspeeds
-        windspeed = np.ma.masked_where(self.watermask()[1]==2, windspeed)
+        windspeed = np.ma.masked_where(self.watermask(tps=True)[1]==2, windspeed)
 
         # specify the number of quiver
         quiPixelSpacing = int(np.round(windspeed.shape[1]/numArrowsRange))
