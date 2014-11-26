@@ -134,9 +134,18 @@ class SARWind(Nansat, object):
             self.set_metadata('WIND_DIRECTION_SOURCE',
                     'numpy.ndarray')
 
-    def get_source_wind(self):
-        ''' Returns metadata information about the source wind direction '''
-        return self.get_metadata('WIND_DIRECTION_SOURCE')
+    def get_source_wind(self, eResampleAlg=1, reprojected=True):
+        ''' 
+        Returns a Nansat object of the auxiliary (model) wind data
+        reprojected to the actual SAR image 
+        '''
+
+        aux_wind = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'))
+        # Interpolation onto SAR image
+        if reprojected:
+            aux_wind.reproject(self, eResampleAlg=eResampleAlg)
+
+        return aux_wind
 
     def _get_aux_wind_from_str(self, aux_wind_source):
 
@@ -161,7 +170,7 @@ class SARWind(Nansat, object):
                         'must have the same shape as the SAR NRCS')
         return wind_directions
 
-    def _get_wind_direction_array(self, aux_wind, eResampleAlg):
+    def _get_wind_direction_array(self, aux_wind):
         '''
             Reproject wind and return the wind directions
         '''
@@ -169,9 +178,6 @@ class SARWind(Nansat, object):
             raise ValueError('Wind direction is not available')
 
         wind_direction_time = aux_wind.get_time()[0]
-
-        # Interpolation onto SAR image
-        aux_wind.reproject(self, eResampleAlg=eResampleAlg)
 
         # Check time difference between SAR image and wind direction object
         timediff = self.SAR_image_time - wind_direction_time
@@ -212,23 +218,9 @@ class SARWind(Nansat, object):
         '''
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
-
-        # following checks should be simplified using 'WIND_DIRECTION_SOURCE'
-        # metadata
-        if isinstance(wind_direction, str):
-            wind_direction_array, wind_direction_time, model_windspeed = \
+        wind_direction_array, wind_direction_time, model_windspeed = \
                     self._get_wind_direction_array(
-                            self._get_aux_wind_from_str(wind_direction),
-                            eResampleAlg )
-        elif isinstance(wind_direction,Nansat):
-            wind_direction_array, wind_direction_time, model_windspeed = \
-                self._get_wind_direction_array( wind_direction, eResampleAlg )
-        elif isinstance(wind_direction, int):
-            wind_direction_array = self._check_wind_direction_array_dims(
-                    np.ones(self.shape())*wind_direction )
-        elif isinstance(wind_direction, np.ndarray):
-            wind_direction_array = self._check_wind_direction_array_dims(
-                    wind_direction )
+                            self.get_source_wind(eResampleAlg) )
 
         if isinstance(wind_direction, int) or isinstance(wind_direction, np.ndarray):
             wind_direction_time = None # Not relevant in this case
