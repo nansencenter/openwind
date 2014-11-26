@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	21.11.2014
-# Last modified:26.11.2014 14:04
+# Last modified:26.11.2014 15:54
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -85,6 +85,9 @@ class BayesianWind(SARWind):
         if doppler_file:
             # Get Nansat object of the range Doppler shift
             dop = Nansat(doppler_file)
+            # Estimate with grid_based_uncertainty also here - there are some
+            # artifacts in the final results relating to the Doppler that
+            # perhaps could be improved
             dop.reproject(self, eResampleAlg=self.resample_alg, tps=True)
             fdg = dop['dop_coef_observed'] - dop['dop_coef_predicted'] - \
                     dop['range_bias_scene'] - dop['azibias']
