@@ -143,7 +143,7 @@ class SARWind(Nansat, object):
         aux_wind = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'))
         # Interpolation onto SAR image
         if reprojected:
-            aux_wind.reproject(self, eResampleAlg=eResampleAlg)
+            aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
 
         return aux_wind
 

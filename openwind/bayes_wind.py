@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	21.11.2014
-# Last modified:26.11.2014 13:57
+# Last modified:26.11.2014 14:04
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -85,7 +85,7 @@ class BayesianWind(SARWind):
         if doppler_file:
             # Get Nansat object of the range Doppler shift
             dop = Nansat(doppler_file)
-            dop.reproject(self, eResampleAlg=self.resample_alg)
+            dop.reproject(self, eResampleAlg=self.resample_alg, tps=True)
             fdg = dop['dop_coef_observed'] - dop['dop_coef_predicted'] - \
                     dop['range_bias_scene'] - dop['azibias']
             #fdg_err = dop['range_bias_std_scene'] - this is not the uncertainty...
@@ -102,7 +102,7 @@ class BayesianWind(SARWind):
         model_wind.add_band(array=err_v, parameters={'name':'err_v'})
 
         # Reproject to SAR image
-        model_wind.reproject(self, eResampleAlg=self.resample_alg)
+        model_wind.reproject(self, eResampleAlg=self.resample_alg, tps=True)
 
         # Get uncertainties in model wind  
         err_u = model_wind['err_u']
