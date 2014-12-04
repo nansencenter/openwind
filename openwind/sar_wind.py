@@ -80,7 +80,8 @@ class SARWind(Nansat, object):
 
         self.SAR_image_time = self.get_time(
                 self.sigma0_bandNo).replace(tzinfo=None)
-        self._set_wind_direction_source(wind_direction)
+        if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
+            self._set_wind_direction_source(wind_direction)
 
         if pixelsize != 'fullres':
             print 'Resizing SAR image to ' + str(pixelsize) + ' m pixel size'
