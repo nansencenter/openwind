@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	19.11.2014
-# Last modified:21.11.2014 14:38
+# Last modified:04.12.2014 12:15
 # Copyright:    (c) NERSC
 # License:      GNU General Public License
 #-------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ DESCRIPTION         = "A python package for estimating high resolution wind from
 LONG_DESCRIPTION    = "A python package for estimating high resolution wind from SAR images"
 MAJOR               = 0
 MINOR               = 6
-MICRO               = 0
+MICRO               = 1
 # Make sure to tag releases as "v%d.%d.%d" %(MAJOR, MINOR, MICRO)
 URL                 = "https://github.com/nansencenter/openwind"
 DOWNLOAD_URL        = "https://github.com/nansencenter/openwind/archive/v%d.%d.%d.tar.gz" %(MAJOR, MINOR, MICRO)
@@ -39,7 +39,7 @@ import_error_msg = "OpenWind v%d.%d.%d requires %s, which should be installed se
 try:
     import nansat
 except ImportError:
-    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6'))
+    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6.1'))
 
 #----------------------------------------------------------------------------#
 #                               Install package
