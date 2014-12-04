@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	21.11.2014
-# Last modified:26.11.2014 15:54
+# Last modified:28.11.2014 10:37
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -66,8 +66,8 @@ def grid_based_uncertainty(arr, radius):
 class BayesianWind(SARWind):
     wind_speed_range = np.linspace(-20,20,81)
     model_err = 1.5 # alternatively using method grid_based_uncertainty
-    doppler_err = 7
-    s0_err = 0.078
+    doppler_err = 5
+    s0_err_fac = 0.078
     resample_alg = 1
 
     def __init__(self, filename, doppler_file='', *args, **kwargs):
@@ -85,14 +85,34 @@ class BayesianWind(SARWind):
         if doppler_file:
             # Get Nansat object of the range Doppler shift
             dop = Nansat(doppler_file)
-            # Estimate with grid_based_uncertainty also here - there are some
-            # artifacts in the final results relating to the Doppler that
-            # perhaps could be improved
+            # Estimate Doppler uncertainty
+            fdg = dop['dop_coef_observed'] - dop['dop_coef_predicted'] - \
+                    dop['range_bias_scene'] - dop['azibias']
+            fdg[fdg>100] = np.nan
+            fdg[fdg<-100] = np.nan
+            mask = np.isnan(fdg)
+            fdg[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask),
+                    fdg[~mask])
+            err_fdg = grid_based_uncertainty(fdg,2)
+            err_fdg[err_fdg<self.doppler_err]=self.doppler_err
+            dop.add_band(array=err_fdg, parameters={'name':'err_fdg'})
             dop.reproject(self, eResampleAlg=self.resample_alg, tps=True)
             fdg = dop['dop_coef_observed'] - dop['dop_coef_predicted'] - \
                     dop['range_bias_scene'] - dop['azibias']
+            err_fdg = dop['err_fdg']
             #fdg_err = dop['range_bias_std_scene'] - this is not the uncertainty...
         
+        # Estimate sigma0 uncertainty
+        s0 = self['sigma0_VV']
+        err_s0 = self.s0_err_fac*s0
+        #    #mask = np.isnan(fdg)
+        #    #fdg[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask),
+        #    #        fdg[~mask])
+        #err_s0 = grid_based_uncertainty(s0,2)
+        #import ipdb
+        #ipdb.set_trace()
+        #err_s0[err_s0<self.s0_err_fac*s0] = self.s0_err_fac*s0[err_s0<self.s0_err_fac*s0]
+
         # Estimate model wind uncertainty (leads to adjustment near fronts)
         #model_px_resolution = int(np.round( 2 * model_wind.get_pixelsize_meters()[0] /
         #        self.get_pixelsize_meters()[0] ))
@@ -130,7 +150,6 @@ class BayesianWind(SARWind):
         model_v = model_wind['V']
         sar_look = self['SAR_look_direction']
         inci = self['incidence_angle']
-        s0 = self['sigma0_VV']
         print 'Applying Bayesian on one-by-one pixel'
         for i in range(imshape[0]):
             print 'Row %d of %d'%(i,imshape[0])
@@ -153,20 +172,24 @@ class BayesianWind(SARWind):
                 cmod_s0 = cmod5n_forward(speed_apriori,
                         direction_apriori-sar_look[i,j],
                         np.ones(np.shape(speed_apriori))*inci[i,j])
-                cost_sigma0 = cost_function( cmod_s0, s0[i,j], self.s0_err*s0[i,j] )
+                cost_sigma0 = cost_function( cmod_s0, s0[i,j], err_s0[i,j] )
 
                 cost = cost_model_v + cost_model_u + cost_sigma0
                 ind_min = np.where(cost==np.min(cost,axis=None))
                 ub_modcmod[i,j] = u_apriori[ind_min]
                 vb_modcmod[i,j] = v_apriori[ind_min]
 
-                if doppler_file and fdg[i,j]>-100 and fdg[i,j]<100:
+                if (doppler_file and 
+                        fdg[i,j]>-100 and 
+                        fdg[i,j]<100 and 
+                        err_fdg[i,j]!=0 and
+                        not np.isnan(err_fdg[i,j])):
+                    # Calculate Doppler cost function
                     self.has_doppler[i,j] = 1
                     cdop_fdg = cdop(speed_apriori, 
                         sar_look[i,j]-direction_apriori,
                         np.ones(np.shape(speed_apriori))*inci[i,j], 'VV')
-                    cost_doppler = cost_function(cdop_fdg, fdg[i,j],
-                            self.doppler_err)
+                    cost_doppler = cost_function(cdop_fdg, fdg[i,j], err_fdg[i,j])
                     cost += cost_doppler
 
                     ind_min = np.where(cost==np.min(cost,axis=None))
