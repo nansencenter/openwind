@@ -234,7 +234,7 @@ class SARWind(Nansat, object):
         startTime = datetime.now()
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo],
                             np.mod(wind_direction_array -
-                                self['SAR_look_direction'], 360),
+                                self['look_direction'], 360),
                             self['incidence_angle'])
         print 'Calculation time: ' + str(datetime.now() - startTime)
 
