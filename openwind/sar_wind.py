@@ -545,8 +545,5 @@ if __name__ == '__main__':
 
     # Save as netCDF file
     if args.netCDF is not None:
-        print 'NetCDF export temporarily disabled'
-        print 'Waiting for Nansat #47:'
-        print 'https://github.com/nansencenter/nansat/issues/47'
-        #print 'Saving output to netCDF file: ' + args.netCDF
-        #sw.export_wind(args.netCDF)
+        print 'Saving output to netCDF file: ' + args.netCDF
+        sw.export(args.netCDF, bands=[6, 7])  # Exporting windspeed and dir
