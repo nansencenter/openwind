@@ -232,9 +232,13 @@ class SARWind(Nansat, object):
         # - add other CMOD versions than CMOD5
         print 'Calculating SAR wind with CMOD...'
         startTime = datetime.now()
+        try:
+            lookBandNo = self._get_band_number({'standard_name': 'sensor_azimuth_angle'})
+            look_dir = self[lookBandNo]
+        except:
+            raise Exception('Look direction is not available for SAR image.')
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo],
-                            np.mod(wind_direction_array -
-                                self['look_direction'], 360),
+                            np.mod(wind_direction_array - look_dir, 360),
                             self['incidence_angle'])
         print 'Calculation time: ' + str(datetime.now() - startTime)
 
