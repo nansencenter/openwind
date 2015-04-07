@@ -125,10 +125,10 @@ class SARWind(Nansat, object):
                     wind_direction)
         elif isinstance(wind_direction,Nansat):
             self.set_metadata('WIND_DIRECTION_SOURCE',
-                    'Nansat instance of '+wind_direction.fileName)
+                    wind_direction.fileName)
         elif isinstance(wind_direction, int):
             self.set_metadata('WIND_DIRECTION_SOURCE',
-                    'Set by user ('+str(wind_direction)+')')
+                    str(wind_direction))
         elif isinstance(wind_direction, np.ndarray):
             wind_direction_array = self._check_wind_direction_array_dims(
                     wind_direction )
@@ -209,7 +209,7 @@ class SARWind(Nansat, object):
         u_array = aux_wind[wind_u_bandNo]
         v_array = aux_wind[wind_v_bandNo]
         # 0 degrees meaning wind from North, 90 degrees meaning wind from East
-        if u_array==None:
+        if u_array is None:
             raise Exception('Could not read wind vectors')
         return np.degrees(np.arctan2(-u_array, -v_array)), \
                 wind_direction_time, aux_wind['windspeed']
