@@ -8,7 +8,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	03.07.2014
-# Last modified:03.07.2014 11:29
+# Last modified:03.02.2015 10:58
 # Copyright:    (c) Ifremer
 # License:      GNU General Public License, v.3
 #               http://www.gnu.org/licenses/gpl-3.0.html
@@ -61,11 +61,11 @@ def cdop(u10, phi, inc, pol):
     size = sizes.max()
     if ((sizes != size) & (sizes != 1)).any():
         raise Exception('Inputs sizes do not agree.')
-    if pol not in ['VV', 'HH']:
+    if pol.upper() not in ['VV', 'HH']:
         raise Exception('Unknown polarisation : '+pol)
     # NN coefficients (W=weights and B=biases)
     # (coefficient names in mouche2012 are given)
-    if pol == 'VV':
+    if pol.upper() == 'VV':
         # lambda[0:2,1]
         B1 = np.array([-0.343935744939, 0.108823529412, 0.15],
                       dtype='float32')
@@ -103,7 +103,7 @@ def cdop(u10, phi, inc, pol):
         B4 = np.array(-52.2644487109, dtype='float32')
         # alpha
         W4 = np.array(111.528184073, dtype='float32')
-    elif pol == 'HH':
+    elif pol.upper() == 'HH':
         # lambda[0:2,1]
         B1 = np.array([-0.342097701547, 0.118181818182, 0.15],
                       dtype='float32')
