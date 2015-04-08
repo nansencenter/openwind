@@ -232,9 +232,13 @@ class SARWind(Nansat, object):
         # - add other CMOD versions than CMOD5
         print 'Calculating SAR wind with CMOD...'
         startTime = datetime.now()
+        try:
+            lookBandNo = self._get_band_number({'standard_name': 'sensor_azimuth_angle'})
+            look_dir = self[lookBandNo]
+        except:
+            raise Exception('Look direction is not available for SAR image.')
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo],
-                            np.mod(wind_direction_array -
-                                self['look_direction'], 360),
+                            np.mod(wind_direction_array - look_dir, 360),
                             self['incidence_angle'])
         print 'Calculation time: ' + str(datetime.now() - startTime)
 
@@ -541,8 +545,5 @@ if __name__ == '__main__':
 
     # Save as netCDF file
     if args.netCDF is not None:
-        print 'NetCDF export temporarily disabled'
-        print 'Waiting for Nansat #47:'
-        print 'https://github.com/nansencenter/nansat/issues/47'
-        #print 'Saving output to netCDF file: ' + args.netCDF
-        #sw.export_wind(args.netCDF)
+        print 'Saving output to netCDF file: ' + args.netCDF
+        sw.export(args.netCDF, bands=[6, 7])  # Exporting windspeed and dir
