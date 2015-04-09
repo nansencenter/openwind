@@ -7,7 +7,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	26.05.2014
-# Last modified:04.12.2014 12:18
+# Last modified:07.04.2015 11:52
 # Copyright:    (c) NERSC
 # License:
 #-------------------------------------------------------------------------------
@@ -29,13 +29,7 @@ dirname_test_plots = os.path.join(
 '''
 Downloads online test data, saves it locally and performs tests.
 
-This test suite does not test command line usage. See
-http://hg.python.org/cpython/file/default/Lib/test/test_cmd_line_script.py for
-several examples of how to test handling of command line arguments.
 '''
-
-warn('Tests may not work if run from inside OpenWind root folder. The ' \
-        'reason is unclear...')
 
 class SARWindTest(unittest.TestCase):
     def setUp(self):
