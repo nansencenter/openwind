@@ -511,11 +511,13 @@ class SARWind(Nansat, object):
 ###################################
 def create_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('sar_image', help='SAR image filename')
+    parser.add_argument('-s', dest='SAR_filename', 
+                        required=True, help='SAR image filename')
     parser.add_argument('-w', dest='wind_direction',
-            default='ncep_wind_online', help='Wind direction filename or constant '
-                ' (integer, 0 for wind from North, 90 for wind from East etc.). '
-                'Omit this argument for automatic download of NCEP GFS winds.')
+            default='ncep_wind_online',
+            help='Wind direction filename or constant '
+            ' (integer, 0 for wind from North, 90 for wind from East etc.). '
+            'Omit this argument for automatic download of NCEP GFS winds.')
     parser.add_argument('-n', dest='netCDF',
             help='Export numerical output to NetCDF file')
     parser.add_argument('-f', dest='figure_filename',
