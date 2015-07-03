@@ -30,7 +30,8 @@ class SARWind(Nansat, object):
     '''
 
     def __init__(self, sar_image, wind_direction='ncep_wind_online',
-                    pixelsize=500, eResampleAlg=1, *args, **kwargs):
+                    band_name=None, pixelsize=500, eResampleAlg=1, *args,
+                    **kwargs):
         '''
             Parameters
             -----------
@@ -78,6 +79,9 @@ class SARWind(Nansat, object):
         except:
             raise TypeError(self.fileName +
                 ' does not have SAR NRCS in VV polarization')
+
+        if band_name:
+            self.sigma0_bandNo = self._get_band_number({'name': band_name})
 
         self.SAR_image_time = self.get_time(
                 self.sigma0_bandNo).replace(tzinfo=None)
@@ -504,6 +508,19 @@ class SARWind(Nansat, object):
 
         nMap.save(fileName, landmask=landmask, **kwargs)
 
+    def export(self, *args, **kwargs):
+        bands = kwargs.pop('bands', None)
+        if not bands:
+            bands = [
+                    self._get_band_number('U'),
+                    self._get_band_number('V'),
+                    self._get_band_number('winddirection'), 
+                    self._get_band_number('windspeed'), 
+                ]
+            if self.has_band('model_windspeed'):
+                bands.append(self._get_band_number('model_windspeed'))
+        # TODO: add name of original file to metadata
+        super(SARWind, self).export(bands=bands, *args, **kwargs)
 
 
 ###################################
