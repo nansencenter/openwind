@@ -69,12 +69,13 @@ class SARWind(Nansat, object):
             self.vrt = sar_image.vrt
             self.mapper = sar_image.mapper
 
-        # Check that this is a SAR image with VV pol NRCS
+        # Check that this is a SAR image with real-valued VV pol NRCS
         try:
             self.sigma0_bandNo = self._get_band_number({
                 'standard_name':
                     'surface_backwards_scattering_coefficient_of_radar_wave',
-                'polarization': 'VV'
+                'polarization': 'VV',
+                'dataType': '6'
             })
         except:
             raise TypeError(self.fileName +
@@ -86,7 +87,8 @@ class SARWind(Nansat, object):
         self.SAR_image_time = self.get_time(
                 self.sigma0_bandNo).replace(tzinfo=None)
         if not self.has_band('winddirection'):
-            self.set_aux_wind(wind_direction, eResampleAlg=eResampleAlg)
+            self.set_aux_wind(wind_direction, eResampleAlg=eResampleAlg,
+                    **kwargs)
 
         if pixelsize != 'fullres':
             print 'Resizing SAR image to ' + str(pixelsize) + ' m pixel size'
@@ -182,7 +184,7 @@ class SARWind(Nansat, object):
                     self.SAR_image_time, ':%Y%m%d%H%M'))
             else:
                 self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind_source)
-            aux = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'))
+            aux = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'), **kwargs)
             wdir, wdir_time, wspeed = self._get_wind_direction_array(aux,
                                         *args, **kwargs)
 
@@ -197,7 +199,8 @@ class SARWind(Nansat, object):
                         'must have the same shape as the SAR NRCS')
         return
 
-    def _get_wind_direction_array(self, aux_wind, eResampleAlg=1):
+    def _get_wind_direction_array(self, aux_wind, eResampleAlg=1, *args,
+            **kwargs):
         '''
             Reproject wind and return the wind directions, time and speed
         '''
@@ -242,7 +245,8 @@ class SARWind(Nansat, object):
         if u_array is None:
             raise Exception('Could not read wind vectors')
         return np.degrees(np.arctan2(-u_array, -v_array)), \
-                wind_direction_time, aux_wind['windspeed']
+                wind_direction_time, \
+                np.sqrt(np.power(u_array, 2) + np.power(v_array, 2))
 
     def _calculate_wind(self):
         '''

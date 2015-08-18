@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	21.11.2014
-# Last modified:28.11.2014 10:37
+# Last modified:08.07.2015 11:25
 # Copyright:    (c) NERSC
 # License:      
 #-------------------------------------------------------------------------------
@@ -67,7 +67,9 @@ class BayesianWind(SARWind):
     wind_speed_range = np.linspace(-20,20,81)
     model_err = 1.5 # alternatively using method grid_based_uncertainty
     doppler_err = 5
-    s0_err_fac = 0.078
+    # s0 error: use variance within grid cell (going from full res to, e.g.,
+    # 500m) - this should not be constant..
+    s0_err_fac = 0.078 # Portabella et al. (1998, 2002)
     resample_alg = 1
 
     def __init__(self, filename, doppler_file='', *args, **kwargs):
