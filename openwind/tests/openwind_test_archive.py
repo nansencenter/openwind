@@ -53,7 +53,7 @@ class OpenWindTestData():
             self.noData = False
 
     def get_ncep_agulhas(self):
-        ncep_agulhas_url = 'ftp://ftp.nersc.no/pub/python_test_data/ncep/gfs20120328.t00z.master.grbf00'
+        ncep_agulhas_url = 'ftp://ftp.nersc.no/pub/nansat/test_data/ncep/gfs20120328.t00z.master.grbf00'
         fname = os.path.basename(ncep_agulhas_url)
         ncep_agulhas = os.path.join(dirname_test_data,fname)
         if not os.path.isfile(ncep_agulhas):
@@ -73,7 +73,7 @@ class OpenWindTestData():
             self.radarsat2.append(rs2_quad)
 
     def get_asar_agulhas(self):
-        asar_agulhas_url = 'ftp://ftp.nersc.no/pub/python_test_data/asar/ASA_WSM_1PNPDE20120327_205532_000002143113_00100_52700_6903.N1'
+        asar_agulhas_url = 'ftp://ftp.nersc.no/pub/nansat/test_data/asar/ASA_WSM_1PNPDE20120327_205532_000002143113_00100_52700_6903.N1'
         fname = os.path.basename(asar_agulhas_url)
         asar_agulhas = os.path.join(dirname_test_data, fname)
         if not os.path.isfile(asar_agulhas):
