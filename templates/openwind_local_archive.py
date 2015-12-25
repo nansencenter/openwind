@@ -12,15 +12,18 @@
 # License:      
 #-------------------------------------------------------------------------------
 '''
-    Template for local test data. Copy the file to somewhere on your pythonpath
-    and modify the paths or add your own data. It would be nice if the template
-    is also updated in case of new data. 
+    Template for local test data - this works with the develop vm in
+    https://github.com/nansencenter/nersc-vagrant. 
+    
+    You may also copy the file to somewhere on your pythonpath and modify the
+    paths or add your own data. It would be nice if the template is also
+    updated in case of new data. 
     
     PLEASE DO NOT "GIT PUSH" IF ONLY THE PATHS ARE CHANGED.
 '''
 
 # Radarsat-2 file:
-rs2 = '/Volumes/sat_downloads_radarsat2/RS2_20140326_054601_0076_SCWA_HHHV_SGF_316922_8221_9516957.zip'
+rs2 = '/mnt/10.11.12.232/sat_downloads_radarsat2/RS2_20140326_054601_0076_SCWA_HHHV_SGF_316922_8221_9516957.zip'
 try:
     with open(rs2) as f:
         pass
@@ -30,7 +33,7 @@ except IOError as exc:
     #raise IOError("%s: %s" % (rs2, exc.strerror))
 
 # Quad-pol Radarsat-2
-rs2_quad = '/Volumes/sat_downloads_radarsat2/fine_quad_pol/RS2_20131214_084140_0004_FQ4_HHVVHVVH_SLC_299782_1914_9217833.zip'
+rs2_quad = '/mnt/10.11.12.232/sat_downloads_radarsat2/fine_quad_pol/RS2_20131214_084140_0004_FQ4_HHVVHVVH_SLC_299782_1914_9217833.zip'
 try:
     with open(rs2_quad) as f:
         pass
