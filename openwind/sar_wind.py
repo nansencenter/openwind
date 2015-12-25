@@ -179,12 +179,12 @@ class SARWind(Nansat, object):
             # mapper name is given. By adding the SAR image time stamp, we
             # can then get the data online
             if aux_wind_source in mnames:
-                self.set_metadata('WIND_DIRECTION_SOURCE', 
-                    aux_wind_source + datetime.strftime(
-                    self.SAR_image_time, ':%Y%m%d%H%M'))
-            else:
-                self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind_source)
-            aux = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'), **kwargs)
+                aux_wind_source = aux_wind_source + \
+                        datetime.strftime(self.SAR_image_time, ':%Y%m%d%H%M')
+            aux = Nansat(aux_wind_source, **kwargs)
+            # Set filename of source wind in metadata
+            self.set_metadata('WIND_DIRECTION_SOURCE', 
+                   aux.get_metadata(bandID='U')['SourceFilename'])
             wdir, wdir_time, wspeed = self._get_wind_direction_array(aux,
                                         *args, **kwargs)
 
