@@ -84,8 +84,9 @@ class SARWind(Nansat, object):
         if band_name:
             self.sigma0_bandNo = self._get_band_number({'name': band_name})
 
-        self.SAR_image_time = self.get_time(
-                self.sigma0_bandNo).replace(tzinfo=None)
+        self.SAR_image_time = self.time_coverage_start
+           # get_time(
+           #     self.sigma0_bandNo).replace(tzinfo=None)
         if not self.has_band('winddirection'):
             self.set_aux_wind(wind_direction, eResampleAlg=eResampleAlg,
                     **kwargs)
@@ -211,7 +212,7 @@ class SARWind(Nansat, object):
 
         if not self.get_metadata('WIND_DIRECTION_SOURCE'):
             self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind.fileName)
-        wind_direction_time = aux_wind.get_time()[0]
+        wind_direction_time = aux_wind.time_coverage_start #get_time()[0]
 
         # Check time difference between SAR image and wind direction object
         timediff = self.SAR_image_time - wind_direction_time
