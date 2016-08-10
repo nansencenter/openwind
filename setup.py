@@ -20,7 +20,7 @@ DESCRIPTION         = "A python package for estimating high resolution wind from
 LONG_DESCRIPTION    = "A python package for estimating high resolution wind from SAR images"
 MAJOR               = 0
 MINOR               = 6
-MICRO               = 1
+MICRO               = 2
 # Make sure to tag releases as "v%d.%d.%d" %(MAJOR, MINOR, MICRO)
 URL                 = "https://github.com/nansencenter/openwind"
 DOWNLOAD_URL        = "https://github.com/nansencenter/openwind/archive/v%d.%d.%d.tar.gz" %(MAJOR, MINOR, MICRO)
