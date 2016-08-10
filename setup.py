@@ -39,7 +39,7 @@ import_error_msg = "OpenWind v%d.%d.%d requires %s, which should be installed se
 try:
     import nansat
 except ImportError:
-    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6.1'))
+    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6.9'))
 
 #----------------------------------------------------------------------------#
 #                               Install package
