@@ -78,8 +78,7 @@ class SARWind(Nansat, object):
             raise TypeError(self.fileName +
                 ' does not have SAR NRCS in VV polarization')
 
-        self.SAR_image_time = self.get_time(
-                self.sigma0_bandNo).replace(tzinfo=None)
+        self.SAR_image_time = self.time_coverage_start
         if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
             self._set_wind_direction_source(wind_direction)
 
@@ -169,7 +168,7 @@ class SARWind(Nansat, object):
         if not isinstance(aux_wind, Nansat):
             raise ValueError('Wind direction is not available')
 
-        wind_direction_time = aux_wind.get_time()[0]
+        wind_direction_time = aux_wind.time_coverage_start
 
         # Interpolation onto SAR image
         aux_wind.reproject(self, eResampleAlg=eResampleAlg)
@@ -259,7 +258,7 @@ class SARWind(Nansat, object):
         self.add_band(array=windspeed, parameters={
                         'wkv': 'wind_speed',
                         'name': 'windspeed',
-                        'time': self.get_time(self.sigma0_bandNo),
+                        'time': self.time_coverage_start,
                         'wind_direction_time': wind_direction_time
                 })
         self.add_band(array=wind_direction_array, parameters={
