@@ -4,26 +4,27 @@
 #               your python path.
 #
 # Author:       Morten Wergeland Hansen
-# Modified:	Morten Wergeland Hansen
+# Modified: Morten Wergeland Hansen
 #
-# Created:	26.05.2014
+# Created:  26.05.2014
 # Last modified:08.07.2014 15:48
 # Copyright:    (c) NERSC
-# License:      
+# License:
 #-------------------------------------------------------------------------------
 '''
     Template for local test data - this works with the develop vm in
-    https://github.com/nansencenter/nersc-vagrant. 
-    
+    https://github.com/nansencenter/nersc-vagrant.
+
     You may also copy the file to somewhere on your pythonpath and modify the
     paths or add your own data. It would be nice if the template is also
-    updated in case of new data. 
-    
+    updated in case of new data.
+
     PLEASE DO NOT "GIT PUSH" IF ONLY THE PATHS ARE CHANGED.
 '''
 
 # Radarsat-2 file:
 rs2 = '/mnt/10.11.12.232/sat_downloads_radarsat2/RS2_20140326_054601_0076_SCWA_HHHV_SGF_316922_8221_9516957.zip'
+rs2 = '/mnt/10.11.12.232/sat_downloads_radarsat2/RS2_20150503_063316_0076_SCWA_HHHV_SGF_394563_4420_11260944.zip'
 try:
     with open(rs2) as f:
         pass

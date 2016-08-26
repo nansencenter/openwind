@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Name:		openwind.py
+# Name:     openwind.py
 # Purpose:      Calculate wind speed from SAR images and wind direction
 # Authors:      Morten Wergeland Hansen, Knut-Frode Dagestad
 # License:      This file is part of OPENWIND. You can redistribute it or
@@ -87,13 +87,13 @@ class SARWind(Nansat, object):
         self.SAR_image_time = self.time_coverage_start
            # get_time(
            #     self.sigma0_bandNo).replace(tzinfo=None)
-        if not self.has_band('winddirection'):
-            self.set_aux_wind(wind_direction, eResampleAlg=eResampleAlg,
-                    **kwargs)
-
         if pixelsize != 'fullres':
             print 'Resizing SAR image to ' + str(pixelsize) + ' m pixel size'
             self.resize(pixelsize=pixelsize)
+
+        if not self.has_band('winddirection'):
+            self.set_aux_wind(wind_direction, eResampleAlg=eResampleAlg,
+                    **kwargs)
 
         # If this is a netcdf file with already calculated windspeed (e.g.
         # created as a SARWind object in order to use the plotting functions),
@@ -184,7 +184,7 @@ class SARWind(Nansat, object):
                         datetime.strftime(self.SAR_image_time, ':%Y%m%d%H%M')
             aux = Nansat(aux_wind_source, **kwargs)
             # Set filename of source wind in metadata
-            self.set_metadata('WIND_DIRECTION_SOURCE', 
+            self.set_metadata('WIND_DIRECTION_SOURCE',
                    aux.get_metadata(bandID='U')['SourceFilename'])
             wdir, wdir_time, wspeed = self._get_wind_direction_array(aux,
                                         *args, **kwargs)
@@ -215,7 +215,8 @@ class SARWind(Nansat, object):
         wind_direction_time = aux_wind.time_coverage_start #get_time()[0]
 
         # Check time difference between SAR image and wind direction object
-        timediff = self.SAR_image_time - wind_direction_time
+        timediff = self.SAR_image_time.replace(tzinfo=None) - wind_direction_time
+
         try:
             hoursDiff = np.abs(timediff.total_seconds()/3600.)
         except: # for < python2.7
@@ -278,7 +279,7 @@ class SARWind(Nansat, object):
         self.add_band(array=windspeed, parameters={
                         'wkv': 'wind_speed',
                         'name': 'windspeed',
-                        'time': self.get_time(self.sigma0_bandNo),
+                        'time': self.time_coverage_start,
                         'wind_direction_time': wind_direction_time
                 })
 
@@ -519,8 +520,8 @@ class SARWind(Nansat, object):
             bands = [
                     self._get_band_number('U'),
                     self._get_band_number('V'),
-                    self._get_band_number('winddirection'), 
-                    self._get_band_number('windspeed'), 
+                    self._get_band_number('winddirection'),
+                    self._get_band_number('windspeed'),
                 ]
             if self.has_band('model_windspeed'):
                 bands.append(self._get_band_number('model_windspeed'))
@@ -533,7 +534,7 @@ class SARWind(Nansat, object):
 ###################################
 def create_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', dest='SAR_filename', 
+    parser.add_argument('-s', dest='SAR_filename',
                         required=True, help='SAR image filename')
     parser.add_argument('-w', dest='wind_direction',
             default='ncep_wind_online',
