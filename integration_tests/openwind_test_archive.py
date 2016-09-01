@@ -37,9 +37,10 @@ except IOError as e:
 '''
 class OpenWindTestData():
 
-    asar = []
-    radarsat2 = []
-    ncep4asar = []
+    asar = {}
+    radarsat2 = {}
+    sentinel1a = {}
+    ncep4asar = {}
     noData = True
 
     def __init__(self):
@@ -63,7 +64,7 @@ class OpenWindTestData():
             warnings.warn( "Could not access ftp-site with test data - contact " \
                     "morten.stette@nersc.no to get the ftp-server at NERSC restarted" )
         else:
-            self.ncep4asar.append(ncep_agulhas)
+            self.ncep4asar['agulhas'] = ncep_agulhas
 
     def get_local(self):
         # check for data from local archives
@@ -83,5 +84,5 @@ class OpenWindTestData():
             warnings.warn( "Could not access ftp-site with test data - contact " \
                     "morten.stette@nersc.no to get the ftp-server at NERSC restarted" )
         else:
-            self.asar.append(asar_agulhas)
+            self.asar['agulhas'] = asar_agulhas
 
