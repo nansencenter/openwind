@@ -87,3 +87,5 @@ class OpenWindTestData():
         else:
             self.asar['agulhas'] = asar_agulhas
 
+    def get_sentinel1a_small(self):
+        s1a_url = 'ftp://ftp.nersc.no/pub/openwind/sentinel1A/S1A_EW_GRDM_1SDV_20160811T223512_20160811T223616_012559_013ACD_2E05.zip'
