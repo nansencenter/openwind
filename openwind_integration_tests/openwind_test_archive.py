@@ -69,7 +69,8 @@ class OpenWindTestData():
     def get_local(self):
         # check for data from local archives
         if 'rs2' in globals() and rs2:
-            self.radarsat2.append(rs2)
+            self.radarsat2.append(rs2) # this will fail because self.radarsat2
+            #is now a dict - adjust when relevant...
         if 'rs2_quad' in globals() and rs2_quad:
             self.radarsat2.append(rs2_quad)
 
