@@ -210,7 +210,7 @@ class SARWind(Nansat, object):
 
         aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
 
-        if not self.get_metadata('WIND_DIRECTION_SOURCE'):
+        if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
             self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind.fileName)
         wind_direction_time = aux_wind.time_coverage_start #get_time()[0]
 
