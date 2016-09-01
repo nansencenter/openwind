@@ -21,7 +21,7 @@ from warnings import warn
 from openwind import SARWind
 from nansat.nansat import Nansat, Domain
 
-import openwind.tests.openwind_test_archive as ota
+import openwind_integration_tests.openwind_test_archive as ota
 
 dirname_test_plots = os.path.join(
                         os.path.dirname(os.path.abspath(__file__)), 'plots')
@@ -52,7 +52,7 @@ class SARWindTest(unittest.TestCase):
         if len(self.test_data.asar)==0:
             raise IOError('No ASAR data - try adding some as ' \
                     'described in templates/openwind_local_archive.py' )
-        for i in range(len(self.test_data.asar)):
+        for i in self.test_data.asar:
             w = SARWind(self.test_data.asar[i],
                     wind_direction=self.test_data.ncep4asar[i])
         if sys.version_info < (2, 7):
@@ -73,7 +73,7 @@ class SARWindTest(unittest.TestCase):
         if len(self.test_data.asar)==0:
             raise IOError('No ASAR data - try adding some as ' \
                     'described in templates/openwind_local_archive.py' )
-        for i in range(len(self.test_data.asar)):
+        for i in self.test_data.asar:
             asar = Nansat(self.test_data.asar[i])
             w = SARWind(asar, wind_direction=self.test_data.ncep4asar[i])
         if sys.version_info < (2, 7):
@@ -85,7 +85,7 @@ class SARWindTest(unittest.TestCase):
         if len(self.test_data.asar)==0:
             raise IOError('No ASAR data - try adding some as ' \
                     'described in templates/openwind_local_archive.py' )
-        for i in range(len(self.test_data.asar)):
+        for i in self.test_data.asar:
             asar = Nansat(self.test_data.asar[i])
             mw = Nansat(self.test_data.ncep4asar[i])
             w = SARWind(asar, wind_direction=mw)
@@ -98,9 +98,9 @@ class SARWindTest(unittest.TestCase):
         if len(self.test_data.asar)==0:
             raise IOError('No ASAR data - try adding some as ' \
                     'described in templates/openwind_local_archive.py' )
-        asar = Nansat(self.test_data.asar[0])
+        asar = Nansat(self.test_data.asar['agulhas'])
         asar.resize(pixelsize=500, eResampleAlg=1)
-        mw = Nansat(self.test_data.ncep4asar[0])
+        mw = Nansat(self.test_data.ncep4asar['agulhas'])
         mw.reproject(asar, eResampleAlg=1)
         if sys.version_info < (2, 7):
             type(mw[1]) == np.ndarray
