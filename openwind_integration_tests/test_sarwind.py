@@ -34,8 +34,8 @@ Downloads online test data, saves it locally and performs tests.
 class SARWindTest(unittest.TestCase):
     def setUp(self):
         self.test_data = ota.OpenWindTestData()
-        if self.test_data.noData:
-            raise ValueError('No test data available')
+        self.test_data.get_asar_agulhas()
+        self.test_data.get_ncep_agulhas()
 
     def test_sarwind_using_default(self):
         if len(self.test_data.radarsat2)==0:

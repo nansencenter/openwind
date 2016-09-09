@@ -41,17 +41,6 @@ class OpenWindTestData():
     radarsat2 = {}
     sentinel1a = {}
     ncep4asar = {}
-    noData = True
-
-    def __init__(self):
-        # OBS: SAR and wind data must be added in parallel
-        self.get_asar_agulhas()
-        self.get_ncep_agulhas()
-        self.get_local()
-        if self.asar:
-            self.noData = False
-        if self.radarsat2:
-            self.noData = False
 
     def get_ncep_agulhas(self):
         ncep_agulhas_url = 'ftp://ftp.nersc.no/pub/nansat/test_data/ncep/gfs20120328.t00z.master.grbf00'
@@ -75,7 +64,8 @@ class OpenWindTestData():
             self.radarsat2.append(rs2_quad)
 
     def get_asar_agulhas(self):
-        asar_agulhas_url = 'ftp://ftp.nersc.no/pub/nansat/test_data/asar/ASA_WSM_1PNPDE20120327_205532_000002143113_00100_52700_6903.N1'
+        asar_agulhas_url = 'ftp://ftp.nersc.no/pub/nansat/test_data/asar/' \
+                'ASA_WSM_1PNPDE20120327_205532_000002143113_00100_52700_6903.N1'
         fname = os.path.basename(asar_agulhas_url)
         asar_agulhas = os.path.join(dirname_test_data, fname)
         if not os.path.isfile(asar_agulhas):
@@ -87,5 +77,28 @@ class OpenWindTestData():
         else:
             self.asar['agulhas'] = asar_agulhas
 
-    def get_sentinel1a_small(self):
-        s1a_url = 'ftp://ftp.nersc.no/pub/openwind/sentinel1A/S1A_EW_GRDM_1SDV_20160811T223512_20160811T223616_012559_013ACD_2E05.zip'
+    def get_sentinel1a(self, fsize='small'):
+        '''
+        Download S1A test file from ftp and add it to dictionary
+
+        Parameters
+        ----------
+        fsize : string
+                Keyword indicating which file to test ('small', 'medium', etc.)
+
+        '''
+        s1a_url = {}
+        s1a_url['small'] = 'ftp://ftp.nersc.no/pub/openwind/sentinel1A/' \
+                'S1A_EW_GRDM_1SDV_20150122T171835_20150122T171853_004287_00537D_F076.zip'
+        s1a_url['medium'] = 'ftp://ftp.nersc.no/pub/openwind/sentinel1A/' \
+                'S1A_EW_GRDM_1SDV_20141229T171900_20141229T172003_003937_004BB9_B213.zip'
+        if not fsize in s1a_url.keys():
+            raise ValueError('Invalid input keyword')
+        fname = os.path.basename(s1a_url[fsize])
+        s1a = os.path.join(dirname_test_data, fname)
+        if not os.path.isfile(s1a):
+            os.system('curl -so ' + s1a + ' ' + s1a_url[fsize])
+        if not os.path.isfile(s1a):
+            warnings.warn("Could not access ftp-site containing S1A test data")
+        else:
+            self.sentinel1a[fsize] = s1a

@@ -97,7 +97,7 @@ class SARWind(Nansat, object):
 
         # If this is a netcdf file with already calculated windspeed (e.g.
         # created as a SARWind object in order to use the plotting functions),
-        # do not calculate wind over again
+        # do not recalculate wind
         if not self.has_band('windspeed'):
             self._calculate_wind()
 
