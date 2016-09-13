@@ -82,7 +82,9 @@ class BayesianWind(SARWind):
         speed_apriori = np.sqrt(np.square(u_apriori) + np.square(v_apriori))
 
         # Get Nansat object of the model wind field
-        model_wind = self.get_source_wind(reprojected=False)
+        #model_wind = self.get_source_wind(reprojected=False) # where did this
+        # function go? anyway, the below should be equally fine..
+        model_wind = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'))
 
         if doppler_file:
             # Get Nansat object of the range Doppler shift
@@ -150,11 +152,12 @@ class BayesianWind(SARWind):
 
         model_u = model_wind['U']
         model_v = model_wind['V']
-        sar_look = self['SAR_look_direction']
+        sar_look = self[self._get_band_number({'standard_name':
+                'sensor_azimuth_angle'})]
         inci = self['incidence_angle']
         print 'Applying Bayesian on one-by-one pixel'
         for i in range(imshape[0]):
-            print 'Row %d of %d'%(i,imshape[0])
+            print 'Row %d of %d'%(i+1,imshape[0])
             for j in range(imshape[1]):
                 # There seems to be a problem with Radarsat-2 incidence angles
                 # after resize (nan-values and erroneous resampling)

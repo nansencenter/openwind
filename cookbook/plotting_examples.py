@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from nansat.domain import Domain
 from nansat.nsr import NSR
 from openwind.sar_wind import SARWind
+from openwind.bayes_wind import BayesianWind
 from nansat.nansatmap import Nansatmap
 import openwind_integration_tests.openwind_test_archive as ota
 
@@ -36,7 +37,8 @@ def measure_time_example(fsize='medium'):
 
 def plot_s1a_example(fsize='small'):
     test_data.get_sentinel1a(fsize=fsize)
-    w = SARWind(test_data.sentinel1a[fsize])
+    #w = SARWind(test_data.sentinel1a[fsize])
+    w = BayesianWind(test_data.sentinel1a[fsize])
     cc = w.get_corners()
     lonmin = np.int(np.floor(np.min(cc[0])*100))/100.
     lonmax = np.int(np.ceil(np.max(cc[0])*100))/100.
@@ -44,8 +46,12 @@ def plot_s1a_example(fsize='small'):
     latmax = np.int(np.ceil(np.max(cc[1])*100))/100.
     w.reproject( Domain(NSR().wkt, ext='-lle %s %s %s %s -ts %s %s' %(lonmin,
         latmin, lonmax, latmax, (lonmax-lonmin)*110., (latmax-latmin)*110.) ) )
-    u = w['U']
-    v = w['V']
+    #u = w['U']
+    #v = w['V']
+    windspeed = w['bspeed_modcmod']
+    winddir = w['bdir_modcmod']
+    u = -windspeed*np.sin((180.0 - winddir)*np.pi/180.0)
+    v = windspeed*np.cos((180.0 - winddir)*np.pi/180.0)
     nmap = Nansatmap(w, resolution='h')
     nmap.pcolormesh(np.hypot(u,v), vmax=18)
     nmap.add_colorbar(fontsize=8)
@@ -68,5 +74,7 @@ def plot_s1a_example(fsize='small'):
     #        'NCEP\n%s' %w.time_coverage_start.isoformat(),
     #    fontsize=8
     #)
-    nmap.fig.savefig('s1a_wind_%s.png'%fsize, dpi=150, bbox_inches='tight')
+
+    #nmap.fig.savefig('s1a_wind_%s.png'%fsize, dpi=150, bbox_inches='tight')
+    nmap.fig.savefig('s1a_bwind_%s.png'%fsize, dpi=150, bbox_inches='tight')
     #nmap.drawgrid()
