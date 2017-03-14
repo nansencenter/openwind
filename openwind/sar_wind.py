@@ -20,6 +20,7 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
+from nansat.tools import OptionError
 from nansat.nansat import Nansat, Domain, _import_mappers
 from nansat.nansatmap import Nansatmap
 from openwind.cmod5n import cmod5n_inverse
@@ -182,10 +183,19 @@ class SARWind(Nansat, object):
             if aux_wind_source in mnames:
                 aux_wind_source = aux_wind_source + \
                         datetime.strftime(self.SAR_image_time, ':%Y%m%d%H%M')
-            aux = Nansat(aux_wind_source, **kwargs)
+            aux = Nansat(aux_wind_source, netcdf_dim={'time':
+                np.datetime64(self.SAR_image_time)})
             # Set filename of source wind in metadata
+            try:
+                wind_u_bandNo = aux._get_band_number({
+                            'standard_name': 'eastward_wind',
+                        })
+            except OptionError:
+                wind_u_bandNo = aux._get_band_number({
+                            'standard_name': 'x_wind',
+                        })
             self.set_metadata('WIND_DIRECTION_SOURCE',
-                   aux.get_metadata(bandID='U')['SourceFilename'])
+                   aux.get_metadata(bandID=wind_u_bandNo)['SourceFilename'])
             wdir, wdir_time, wspeed = self._get_wind_direction_array(aux,
                                         *args, **kwargs)
 
@@ -212,10 +222,10 @@ class SARWind(Nansat, object):
 
         if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
             self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind.fileName)
-        wind_direction_time = aux_wind.time_coverage_start #get_time()[0]
 
         # Check time difference between SAR image and wind direction object
-        timediff = self.SAR_image_time.replace(tzinfo=None) - wind_direction_time
+        timediff = self.SAR_image_time.replace(tzinfo=None) - \
+                aux_wind.time_coverage_start
 
         try:
             hoursDiff = np.abs(timediff.total_seconds()/3600.)
@@ -228,26 +238,39 @@ class SARWind(Nansat, object):
         print 'Time difference between SAR image and wind direction: ' \
                 + '%.2f' % hoursDiff + ' hours'
         print 'SAR image time: ' + str(self.SAR_image_time)
-        print 'Wind dir time: ' + str(wind_direction_time)
+        print 'Wind dir time: ' + str(aux_wind.time_coverage_start)
         if hoursDiff > 3:
             print '#########################################'
             print 'WARNING: time difference exceeds 3 hours!'
             print '#########################################'
 
-        wind_u_bandNo = aux_wind._get_band_number({
+        try:
+            wind_u_bandNo = aux_wind._get_band_number({
                             'standard_name': 'eastward_wind',
                         })
-        wind_v_bandNo = aux_wind._get_band_number({
+        except OptionError:
+            wind_u_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'x_wind',
+                    })
+        try:
+            wind_v_bandNo = aux_wind._get_band_number({
                             'standard_name': 'northward_wind',
                         })
+        except OptionError:
+            wind_v_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'y_wind',
+                    })
         # Get wind direction
         u_array = aux_wind[wind_u_bandNo]
         v_array = aux_wind[wind_v_bandNo]
         # 0 degrees meaning wind from North, 90 degrees meaning wind from East
         if u_array is None:
             raise Exception('Could not read wind vectors')
+        az = aux_wind.azimuth_y()
+        import ipdb
+        ipdb.set_trace()
         return np.degrees(np.arctan2(-u_array, -v_array)), \
-                wind_direction_time, \
+                aux_wind.time_coverage_start, \
                 np.sqrt(np.power(u_array, 2) + np.power(v_array, 2))
 
     def _calculate_wind(self):
@@ -264,6 +287,8 @@ class SARWind(Nansat, object):
                 'sensor_azimuth_angle'})]
         except:
             raise Exception('Look direction is not available for SAR image.')
+        import ipdb
+        ipdb.set_trace()
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo],
                             np.mod(self['winddirection'] - look_dir, 360),
                             self['incidence_angle'])
