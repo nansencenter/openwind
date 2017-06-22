@@ -267,8 +267,6 @@ class SARWind(Nansat, object):
         if u_array is None:
             raise Exception('Could not read wind vectors')
         az = aux_wind.azimuth_y()
-        import ipdb
-        ipdb.set_trace()
         return np.degrees(np.arctan2(-u_array, -v_array)), \
                 aux_wind.time_coverage_start, \
                 np.sqrt(np.power(u_array, 2) + np.power(v_array, 2))
@@ -287,8 +285,6 @@ class SARWind(Nansat, object):
                 'sensor_azimuth_angle'})]
         except:
             raise Exception('Look direction is not available for SAR image.')
-        import ipdb
-        ipdb.set_trace()
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo],
                             np.mod(self['winddirection'] - look_dir, 360),
                             self['incidence_angle'])
