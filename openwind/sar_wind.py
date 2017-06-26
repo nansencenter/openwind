@@ -218,6 +218,25 @@ class SARWind(Nansat, object):
         if not isinstance(aux_wind, Nansat):
             raise ValueError('Input parameter must be of type Nansat')
 
+        try:
+            eastward_wind_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'eastward_wind',
+                    })
+        except OptionError:
+            x_wind_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'x_wind',
+                    })
+            y_wind_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'y_wind',
+                    })
+            az = aux_wind.azimuth_y()
+            x_wind = aux_wind[x_wind_bandNo]
+            y_wind = aux_wind[y_wind_bandNo]
+            uu = y_wind*np.sin(az) + x_wind*np.cos(az)
+            vv = y_wind*np.cos(az) - x_wind*np.sin(az)
+            self.add_band(array=uu, parameters={'wkv': 'eastward_wind'})
+            self.add_band(array=vv, parameters={'wkv': 'northward_wind'})
+
         aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
 
         if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
@@ -244,32 +263,24 @@ class SARWind(Nansat, object):
             print 'WARNING: time difference exceeds 3 hours!'
             print '#########################################'
 
-        try:
-            wind_u_bandNo = aux_wind._get_band_number({
-                            'standard_name': 'eastward_wind',
-                        })
-        except OptionError:
-            wind_u_bandNo = aux_wind._get_band_number({
-                        'standard_name': 'x_wind',
-                    })
-        try:
-            wind_v_bandNo = aux_wind._get_band_number({
-                            'standard_name': 'northward_wind',
-                        })
-        except OptionError:
-            wind_v_bandNo = aux_wind._get_band_number({
-                        'standard_name': 'y_wind',
-                    })
-        # Get wind direction
-        u_array = aux_wind[wind_u_bandNo]
-        v_array = aux_wind[wind_v_bandNo]
-        # 0 degrees meaning wind from North, 90 degrees meaning wind from East
-        if u_array is None:
+        # Get band numbers of eastward and northward wind
+        eastward_wind_bandNo = aux_wind._get_band_number({
+                    'standard_name': 'eastward_wind',
+                })
+        northward_wind_bandNo = aux_wind._get_band_number({
+                    'standard_name': 'northward_wind',
+                })
+
+        # Get eastward and northward wind speed components
+        uu = aux_wind[eastward_wind_bandNo]
+        vv = aux_wind[northward_wind_bandNo]
+
+        if uu is None:
             raise Exception('Could not read wind vectors')
-        az = aux_wind.azimuth_y()
-        return np.degrees(np.arctan2(-u_array, -v_array)), \
+        # 0 degrees meaning wind from North, 90 degrees meaning wind from East
+        return np.degrees(np.arctan2(-uu, -vv)), \
                 aux_wind.time_coverage_start, \
-                np.sqrt(np.power(u_array, 2) + np.power(v_array, 2))
+                np.sqrt(np.power(uu, 2) + np.power(vv, 2))
 
     def _calculate_wind(self):
         '''

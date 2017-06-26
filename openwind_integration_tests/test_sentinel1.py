@@ -7,7 +7,7 @@ from nansat.nansat import Nansat, Domain
 
 import openwind_integration_tests.openwind_test_archive as ota
 
-class S1ATest(unittest.TestCase):
+class S1Test(unittest.TestCase):
 
     def setUp(self):
         #self.test_data = ota.OpenWindTestData()
