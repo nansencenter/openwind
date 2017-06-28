@@ -183,8 +183,17 @@ class SARWind(Nansat, object):
             if aux_wind_source in mnames:
                 aux_wind_source = aux_wind_source + \
                         datetime.strftime(self.SAR_image_time, ':%Y%m%d%H%M')
-            aux = Nansat(aux_wind_source, netcdf_dim={'time':
-                np.datetime64(self.SAR_image_time)})
+            aux = Nansat(aux_wind_source, netcdf_dim={
+                    'time': np.datetime64(self.SAR_image_time),
+                    'height2': '10', # height dimension used in AROME arctic
+                                     # datasets
+                },
+                bands = [ # CF standard names of desired bands
+                    'x_wind',
+                    'y_wind', # or..:
+                    'eastward_wind',
+                    'northward_wind',
+                ])
             # Set filename of source wind in metadata
             try:
                 wind_u_bandNo = aux._get_band_number({
@@ -229,13 +238,14 @@ class SARWind(Nansat, object):
             y_wind_bandNo = aux_wind._get_band_number({
                         'standard_name': 'y_wind',
                     })
-            az = aux_wind.azimuth_y()
+            # Get azimuth of aux_wind y-axis in radians
+            az = aux_wind.azimuth_y()*np.pi/180
             x_wind = aux_wind[x_wind_bandNo]
             y_wind = aux_wind[y_wind_bandNo]
             uu = y_wind*np.sin(az) + x_wind*np.cos(az)
             vv = y_wind*np.cos(az) - x_wind*np.sin(az)
-            self.add_band(array=uu, parameters={'wkv': 'eastward_wind'})
-            self.add_band(array=vv, parameters={'wkv': 'northward_wind'})
+            aux_wind.add_band(array=uu, parameters={'wkv': 'eastward_wind'})
+            aux_wind.add_band(array=vv, parameters={'wkv': 'northward_wind'})
 
         aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
 
