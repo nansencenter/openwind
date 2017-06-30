@@ -11,6 +11,7 @@ from __future__ import absolute_import
 import argparse
 import warnings
 from datetime import datetime
+from dateutil.parser import parse
 
 import numpy as np
 
@@ -24,6 +25,9 @@ from nansat.tools import OptionError
 from nansat.nansat import Nansat, Domain, _import_mappers
 from nansat.nansatmap import Nansatmap
 from openwind.cmod5n import cmod5n_inverse
+
+class TimeDiffError(Exception):
+    pass
 
 class SARWind(Nansat, object):
     '''
@@ -247,6 +251,20 @@ class SARWind(Nansat, object):
             aux_wind.add_band(array=uu, parameters={'wkv': 'eastward_wind'})
             aux_wind.add_band(array=vv, parameters={'wkv': 'northward_wind'})
 
+        ## Check overlap (this is time consuming and should perhaps be omitted
+        ## or done differently..)
+        #alatmin, alatmax, alonmin, alonmax = aux_wind.get_min_max_lat_lon()
+        #nlatmin, nlatmax, nlonmin, nlonmax = self.get_min_max_lat_lon()
+        #assert max(0, min(nlatmax, alatmax) - max(nlatmin, alatmin))>0 and \
+        #        max(0, min(nlonmax, alonmax) - max(nlonmin, alonmin))>0, \
+        #        'Auxiliary wind field is not overlapping with the SAR image'
+
+        # Crop wind field to SAR image area of coverage (to avoid issue with
+        # polar stereographic data mentioned in nansat.nansat.Nansat.reproject
+        # comments)
+        aux_wind.crop_lonlat([nlonmin, nlonmax], [nlatmin, nlatmax])
+
+        # Then reproject
         aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
 
         if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
@@ -254,7 +272,7 @@ class SARWind(Nansat, object):
 
         # Check time difference between SAR image and wind direction object
         timediff = self.SAR_image_time.replace(tzinfo=None) - \
-                aux_wind.time_coverage_start
+                parse(aux_wind.get_metadata(bandID=1, key='time_iso_8601'))
 
         try:
             hoursDiff = np.abs(timediff.total_seconds()/3600.)
@@ -269,9 +287,10 @@ class SARWind(Nansat, object):
         print 'SAR image time: ' + str(self.SAR_image_time)
         print 'Wind dir time: ' + str(aux_wind.time_coverage_start)
         if hoursDiff > 3:
-            print '#########################################'
-            print 'WARNING: time difference exceeds 3 hours!'
-            print '#########################################'
+            warnings.warn('Time difference exceeds 3 hours!')
+            if hoursDiff > 12:
+                raise TimeDiffError('Time difference is %.f - impossible to ' \
+                        'estimate reliable wind field' %hoursDiff)
 
         # Get band numbers of eastward and northward wind
         eastward_wind_bandNo = aux_wind._get_band_number({

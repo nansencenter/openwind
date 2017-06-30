@@ -19,7 +19,7 @@ class S1Test(unittest.TestCase):
         self.ecmwf_metno = '/vagrant/shared/test_data/generic/ec_atmo_0_1deg_20170227T000000Z_1h.nc'
 
     def test_s1a_without_explicit_wind_direction(self):
-        w = SARWind(self.s1bIW)
+        w = SARWind(self.s1aEW)
         self.assertIsInstance(w, SARWind)
 
     def test_s1aEW_with_arome_arctic(self):
@@ -27,7 +27,7 @@ class S1Test(unittest.TestCase):
         self.assertIsInstance(w, SARWind)
 
     def test_s1bIW_with_arome_metcoop(self):
-        w = SARWind(self.s1aEW, wind_direction=self.arome_metcoop)
+        w = SARWind(self.s1bIW, wind_direction=self.arome_metcoop)
         self.assertIsInstance(w, SARWind)
 
     def test_s1aEW_with_ecmwf(self):
@@ -35,5 +35,5 @@ class S1Test(unittest.TestCase):
         self.assertIsInstance(w, SARWind)
 
     def test_s1bIW_with_ecmwf(self):
-        w = SARWind(self.s1aEW, wind_direction=self.ecmwf_metno)
+        w = SARWind(self.s1bIW, wind_direction=self.ecmwf_metno)
         self.assertIsInstance(w, SARWind)
