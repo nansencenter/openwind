@@ -259,10 +259,10 @@ class SARWind(Nansat, object):
         #        max(0, min(nlonmax, alonmax) - max(nlonmin, alonmin))>0, \
         #        'Auxiliary wind field is not overlapping with the SAR image'
 
-        # Crop wind field to SAR image area of coverage (to avoid issue with
-        # polar stereographic data mentioned in nansat.nansat.Nansat.reproject
-        # comments)
-        aux_wind.crop_lonlat([nlonmin, nlonmax], [nlatmin, nlatmax])
+        ## Crop wind field to SAR image area of coverage (to avoid issue with
+        ## polar stereographic data mentioned in nansat.nansat.Nansat.reproject
+        ## comments)
+        #aux_wind.crop_lonlat([nlonmin, nlonmax], [nlatmin, nlatmax])
 
         # Then reproject
         aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
