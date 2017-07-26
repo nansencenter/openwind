@@ -286,7 +286,8 @@ class SARWind(Nansat, object):
         print 'Time difference between SAR image and wind direction: ' \
                 + '%.2f' % hoursDiff + ' hours'
         print 'SAR image time: ' + str(self.SAR_image_time)
-        print 'Wind dir time: ' + str(aux_wind.time_coverage_start)
+        print 'Wind dir time: ' + str(parse(aux_wind.get_metadata(bandID=1,
+            key='time_iso_8601')))
         if hoursDiff > 3:
             warnings.warn('Time difference exceeds 3 hours!')
             if hoursDiff > 12:
