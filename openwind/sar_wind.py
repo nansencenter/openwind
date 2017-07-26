@@ -191,7 +191,7 @@ class SARWind(Nansat, object):
                     'time': np.datetime64(self.SAR_image_time),
                     'height2': '10', # height dimension used in AROME arctic
                                      # datasets
-                    'height3': '10', 
+                    'height3': '10',
                 },
                 bands = [ # CF standard names of desired bands
                     'x_wind',
