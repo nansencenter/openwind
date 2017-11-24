@@ -43,7 +43,7 @@ class OpenWindTestData():
     ncep4asar = {}
 
     def get_ncep_agulhas(self):
-        ncep_agulhas_url = 'ftp://ftp.nersc.no/pub/nansat/test_data/ncep/gfs20120328.t00z.master.grbf00'
+        ncep_agulhas_url = 'ftp://ftp.nersc.no/nansat/test_data/ncep/gfs20120328.t00z.master.grbf00'
         fname = os.path.basename(ncep_agulhas_url)
         ncep_agulhas = os.path.join(dirname_test_data,fname)
         if not os.path.isfile(ncep_agulhas):
@@ -64,7 +64,7 @@ class OpenWindTestData():
             self.radarsat2.append(rs2_quad)
 
     def get_asar_agulhas(self):
-        asar_agulhas_url = 'ftp://ftp.nersc.no/pub/nansat/test_data/asar/' \
+        asar_agulhas_url = 'ftp://ftp.nersc.no/nansat/test_data/asar/' \
                 'ASA_WSM_1PNPDE20120327_205532_000002143113_00100_52700_6903.N1'
         fname = os.path.basename(asar_agulhas_url)
         asar_agulhas = os.path.join(dirname_test_data, fname)
@@ -88,9 +88,9 @@ class OpenWindTestData():
 
         '''
         s1a_url = {}
-        s1a_url['small'] = 'ftp://ftp.nersc.no/pub/openwind/sentinel1A/' \
+        s1a_url['small'] = 'ftp://ftp.nersc.no/openwind/sentinel1A/' \
                 'S1A_EW_GRDM_1SDV_20150122T171835_20150122T171853_004287_00537D_F076.zip'
-        s1a_url['medium'] = 'ftp://ftp.nersc.no/pub/openwind/sentinel1A/' \
+        s1a_url['medium'] = 'ftp://ftp.nersc.no/openwind/sentinel1A/' \
                 'S1A_EW_GRDM_1SDV_20141229T171900_20141229T172003_003937_004BB9_B213.zip'
         if not fsize in s1a_url.keys():
             raise ValueError('Invalid input keyword')
