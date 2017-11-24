@@ -266,6 +266,8 @@ class SARWind(Nansat, object):
         #aux_wind.crop_lonlat([nlonmin, nlonmax], [nlatmin, nlatmax])
 
         # Then reproject
+        # OBS: issue #29, test:
+        # openwind_integration_tests.test_sentinel1.S1Test.test_s1aEW_with_arome_arctic
         aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
 
         if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
