@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Name:		openwind.py
+# Name:     openwind.py
 # Purpose:      Calculate wind speed from SAR images and wind direction
 # Authors:      Morten Wergeland Hansen, Knut-Frode Dagestad
 # License:      This file is part of OPENWIND. You can redistribute it or
@@ -11,6 +11,7 @@ from __future__ import absolute_import
 import argparse
 import warnings
 from datetime import datetime
+from dateutil.parser import parse
 
 import numpy as np
 
@@ -20,9 +21,13 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
+from nansat.tools import OptionError
 from nansat.nansat import Nansat, Domain, _import_mappers
 from nansat.nansatmap import Nansatmap
 from openwind.cmod5n import cmod5n_inverse
+
+class TimeDiffError(Exception):
+    pass
 
 class SARWind(Nansat, object):
     '''
@@ -30,7 +35,8 @@ class SARWind(Nansat, object):
     '''
 
     def __init__(self, sar_image, wind_direction='ncep_wind_online',
-                    pixelsize=500, eResampleAlg=1, *args, **kwargs):
+                    band_name=None, pixelsize=500, eResampleAlg=1, *args,
+                    **kwargs):
         '''
             Parameters
             -----------
@@ -68,113 +74,209 @@ class SARWind(Nansat, object):
             self.vrt = sar_image.vrt
             self.mapper = sar_image.mapper
 
-        # Check that this is a SAR image with VV pol NRCS
+        # Check that this is a SAR image with real-valued VV pol NRCS
         try:
-            self.sigma0_bandNo = self._get_band_number(
-                            {'standard_name':
-            'surface_backwards_scattering_coefficient_of_radar_wave',
-                            'polarization': 'VV'})
+            self.sigma0_bandNo = self._get_band_number({
+                'standard_name':
+                    'surface_backwards_scattering_coefficient_of_radar_wave',
+                'polarization': 'VV',
+                'dataType': '6'
+            })
         except:
             raise TypeError(self.fileName +
                 ' does not have SAR NRCS in VV polarization')
 
-        self.SAR_image_time = self.time_coverage_start
-        if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
-            self._set_wind_direction_source(wind_direction)
+        if band_name:
+            self.sigma0_bandNo = self._get_band_number({'name': band_name})
 
+        self.SAR_image_time = self.time_coverage_start
+           # get_time(
+           #     self.sigma0_bandNo).replace(tzinfo=None)
         if pixelsize != 'fullres':
             print 'Resizing SAR image to ' + str(pixelsize) + ' m pixel size'
             self.resize(pixelsize=pixelsize)
 
+        if not self.has_band('winddirection'):
+            self.set_aux_wind(wind_direction, eResampleAlg=eResampleAlg,
+                    **kwargs)
+
         # If this is a netcdf file with already calculated windspeed (e.g.
         # created as a SARWind object in order to use the plotting functions),
-        # do not calculate wind over again
+        # do not recalculate wind
         if not self.has_band('windspeed'):
-            self.calculate_wind(wind_direction,eResampleAlg=eResampleAlg)
+            self._calculate_wind()
 
-    def _set_wind_direction_source(self, wind_direction):
+    def set_aux_wind(self, wind_direction, *args, **kwargs):
         '''
-            Adds wind direction source information to metadata
+        Add auxiliary wind direction as a band with source information in the
+        global metadata.
 
-            Parameters
-            -----------
-            wind_direction : int, numpy array, string, Nansat
-                        Auxiliary wind field information needed to calculate
-                        SAR wind (must be or have wind direction in degrees):
+        Parameters
+        -----------
+        wind_direction : int, numpy array, string, Nansat
+                    Auxiliary wind field information needed to calculate
+                    SAR wind (must be or have wind direction in degrees):
 
-                        - constant wind direction (integer),
-                        - array of wind directions, same size as the SAR data,
-                        - the name of a Nansat compatible file containing
-                          wind direction information
-                        - name of a mapper with functionality to find a wind
-                          file (online or on local disk) matching the SAR
-                          image time [DEFAULT: 'ncep_wind_online']
-                        - a Nansat object with wind direction.
+                    - constant wind direction (integer),
+                    - array of wind directions, same size as the SAR data,
+                    - the name of a Nansat compatible file containing
+                        wind direction information
+                    - name of a mapper with functionality to find a wind
+                        file (online or on local disk) matching the SAR
+                        image time [DEFAULT: 'ncep_wind_online']
+                    - a Nansat object with wind direction.
+        eResampleAlg : int
+                    Resampling algorithm used for reprojecting wind field
+                    to SAR image
+                        -1 : Average,
+                         0 : NearestNeighbour
+                         1 : Bilinear (default),
+                         2 : Cubic,
+                         3 : CubicSpline,
+                         4 : Lancoz
         '''
-
         if isinstance(wind_direction, str):
-            import nansat.nansat
-            mnames = [key.replace('mapper_','') for key in nansat.nansat.nansatMappers]
-            if wind_direction in mnames:
-                self.set_metadata('WIND_DIRECTION_SOURCE', 
-                    wind_direction + datetime.strftime(
-                                    self.SAR_image_time, ':%Y%m%d%H%M'))
-            else:
-                self.set_metadata('WIND_DIRECTION_SOURCE',
-                    wind_direction)
-        elif isinstance(wind_direction,Nansat):
-            self.set_metadata('WIND_DIRECTION_SOURCE',
-                    'Nansat instance of '+wind_direction.fileName)
-        elif isinstance(wind_direction, int):
-            self.set_metadata('WIND_DIRECTION_SOURCE',
-                    'Set by user ('+str(wind_direction)+')')
-        elif isinstance(wind_direction, np.ndarray):
-            wind_direction_array = self._check_wind_direction_array_dims(
-                    wind_direction )
-            self.set_metadata('WIND_DIRECTION_SOURCE',
-                    'numpy.ndarray')
+            wdir, wdir_time, wspeed = self._get_aux_wind_from_str(
+                                        wind_direction, *args, **kwargs)
 
-    def get_source_wind(self):
-        ''' Returns metadata information about the source wind direction '''
-        return self.get_metadata('WIND_DIRECTION_SOURCE')
+        if isinstance(wind_direction, Nansat):
+            wdir, wdir_time, wspeed = self._get_wind_direction_array(
+                                                wind_direction, *args, **kwargs)
 
-    def _get_aux_wind_from_str(self, aux_wind_source):
+        if isinstance(wind_direction, int):
+            wdir, wdir_time, wspeed = self._get_aux_wind_from_int(
+                                        wind_direction)
 
+        if isinstance(wind_direction, np.ndarray):
+            self._check_wind_direction_array_dims(wind_direction)
+            self.set_metadata('WIND_DIRECTION_SOURCE', 'numpy.ndarray')
+            wdir = wind_direction
+            wdir_time = self.SAR_image_time
+            wspeed = None
+
+        self.add_band(array=wdir, parameters={
+                            'wkv': 'wind_from_direction',
+                            'name': 'winddirection',
+                            'time': wdir_time
+                })
+        if not wspeed is None:
+            self.add_band(array=wspeed, nomem=True, parameters={
+                            'wkv': 'wind_speed',
+                            'name': 'model_windspeed',
+                            'time': wdir_time,
+            })
+
+    def _get_aux_wind_from_int(self, wdir):
+        self.set_metadata('WIND_DIRECTION_SOURCE', str(wdir))
+        wdir = wdir*np.ones(self.shape())
+        wdir_time = self.SAR_image_time
+        wspeed = None
+        return wdir, wdir_time, wspeed
+
+    def _get_aux_wind_from_str(self, aux_wind_source, *args, **kwargs):
         try:
-            # If a complete filename of wind direction source is given
-            aux_wind = Nansat(aux_wind_source)
-        except:
-            # If only mapper name is given, we add the SAR image
-            # timestamp as string. Mappers with this functionality
-            # implemented will then find a matching file
-            aux_wind = Nansat(aux_wind_source +
-                                datetime.strftime(
-                                self.SAR_image_time, ':%Y%m%d%H%M'))
-        return aux_wind
+            wdir = int(aux_wind_source)
+            wdir, wdir_time, wspeed = self._get_aux_wind_from_int(wdir)
+        except ValueError:
+            import nansat.nansat
+            mnames = [key.replace('mapper_','') for key in
+                    nansat.nansat.nansatMappers]
+            # check if aux_wind_source is like 'ncep_wind_online', i.e. only
+            # mapper name is given. By adding the SAR image time stamp, we
+            # can then get the data online
+            if aux_wind_source in mnames:
+                aux_wind_source = aux_wind_source + \
+                        datetime.strftime(self.SAR_image_time, ':%Y%m%d%H%M')
+            aux = Nansat(aux_wind_source, netcdf_dim={
+                    'time': np.datetime64(self.SAR_image_time),
+                    'height2': '10', # height dimension used in AROME arctic
+                                     # datasets
+                    'height3': '10',
+                },
+                bands = [ # CF standard names of desired bands
+                    'x_wind',
+                    'y_wind', # or..:
+                    'eastward_wind',
+                    'northward_wind',
+                ])
+            # Set filename of source wind in metadata
+            try:
+                wind_u_bandNo = aux._get_band_number({
+                            'standard_name': 'eastward_wind',
+                        })
+            except OptionError:
+                wind_u_bandNo = aux._get_band_number({
+                            'standard_name': 'x_wind',
+                        })
+            self.set_metadata('WIND_DIRECTION_SOURCE',
+                   aux.get_metadata(bandID=wind_u_bandNo)['SourceFilename'])
+            wdir, wdir_time, wspeed = self._get_wind_direction_array(aux,
+                                        *args, **kwargs)
+
+        return wdir, wdir_time, wspeed
 
     def _check_wind_direction_array_dims(self, wind_directions):
         '''
-            Check and return the provided array of wind directions
+            Check the provided array of wind directions
         '''
         if not wind_directions.shape == self.shape():
             raise RuntimeError('The provided wind direction array ' \
                         'must have the same shape as the SAR NRCS')
-        return wind_directions
+        return
 
-    def _get_wind_direction_array(self, aux_wind, eResampleAlg):
+    def _get_wind_direction_array(self, aux_wind, eResampleAlg=1, *args,
+            **kwargs):
         '''
-            Reproject wind and return the wind directions
+            Reproject wind and return the wind directions, time and speed
         '''
         if not isinstance(aux_wind, Nansat):
-            raise ValueError('Wind direction is not available')
+            raise ValueError('Input parameter must be of type Nansat')
 
-        wind_direction_time = aux_wind.time_coverage_start
+        try:
+            eastward_wind_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'eastward_wind',
+                    })
+        except OptionError:
+            x_wind_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'x_wind',
+                    })
+            y_wind_bandNo = aux_wind._get_band_number({
+                        'standard_name': 'y_wind',
+                    })
+            # Get azimuth of aux_wind y-axis in radians
+            az = aux_wind.azimuth_y()*np.pi/180
+            x_wind = aux_wind[x_wind_bandNo]
+            y_wind = aux_wind[y_wind_bandNo]
+            uu = y_wind*np.sin(az) + x_wind*np.cos(az)
+            vv = y_wind*np.cos(az) - x_wind*np.sin(az)
+            aux_wind.add_band(array=uu, parameters={'wkv': 'eastward_wind'})
+            aux_wind.add_band(array=vv, parameters={'wkv': 'northward_wind'})
 
-        # Interpolation onto SAR image
-        aux_wind.reproject(self, eResampleAlg=eResampleAlg)
+        ## Check overlap (this is time consuming and should perhaps be omitted
+        ## or done differently..)
+        #alatmin, alatmax, alonmin, alonmax = aux_wind.get_min_max_lat_lon()
+        #nlatmin, nlatmax, nlonmin, nlonmax = self.get_min_max_lat_lon()
+        #assert max(0, min(nlatmax, alatmax) - max(nlatmin, alatmin))>0 and \
+        #        max(0, min(nlonmax, alonmax) - max(nlonmin, alonmin))>0, \
+        #        'Auxiliary wind field is not overlapping with the SAR image'
+
+        ## Crop wind field to SAR image area of coverage (to avoid issue with
+        ## polar stereographic data mentioned in nansat.nansat.Nansat.reproject
+        ## comments)
+        #aux_wind.crop_lonlat([nlonmin, nlonmax], [nlatmin, nlatmax])
+
+        # Then reproject
+        # OBS: issue #29, test:
+        # openwind_integration_tests.test_sentinel1.S1Test.test_s1aEW_with_arome_arctic
+        aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
+
+        if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
+            self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind.fileName)
 
         # Check time difference between SAR image and wind direction object
-        timediff = self.SAR_image_time - wind_direction_time
+        timediff = self.SAR_image_time.replace(tzinfo=None) - \
+                parse(aux_wind.get_metadata(bandID=1, key='time_iso_8601'))
+
         try:
             hoursDiff = np.abs(timediff.total_seconds()/3600.)
         except: # for < python2.7
@@ -186,97 +288,69 @@ class SARWind(Nansat, object):
         print 'Time difference between SAR image and wind direction: ' \
                 + '%.2f' % hoursDiff + ' hours'
         print 'SAR image time: ' + str(self.SAR_image_time)
-        print 'Wind dir time: ' + str(wind_direction_time)
+        print 'Wind dir time: ' + str(parse(aux_wind.get_metadata(bandID=1,
+            key='time_iso_8601')))
         if hoursDiff > 3:
-            print '#########################################'
-            print 'WARNING: time difference exceeds 3 hours!'
-            print '#########################################'
+            warnings.warn('Time difference exceeds 3 hours!')
+            if hoursDiff > 12:
+                raise TimeDiffError('Time difference is %.f - impossible to ' \
+                        'estimate reliable wind field' %hoursDiff)
 
-        wind_u_bandNo = aux_wind._get_band_number({
-                            'standard_name': 'eastward_wind',
-                        })
-        wind_v_bandNo = aux_wind._get_band_number({
-                            'standard_name': 'northward_wind',
-                        })
-        # Get wind direction
-        u_array = aux_wind[wind_u_bandNo]
-        v_array = aux_wind[wind_v_bandNo]
-        # 0 degrees meaning wind from North, 90 degrees meaning wind from East
-        if u_array==None:
+        # Get band numbers of eastward and northward wind
+        eastward_wind_bandNo = aux_wind._get_band_number({
+                    'standard_name': 'eastward_wind',
+                })
+        northward_wind_bandNo = aux_wind._get_band_number({
+                    'standard_name': 'northward_wind',
+                })
+
+        # Get eastward and northward wind speed components
+        uu = aux_wind[eastward_wind_bandNo]
+        vv = aux_wind[northward_wind_bandNo]
+
+        if uu is None:
             raise Exception('Could not read wind vectors')
-        return np.degrees(np.arctan2(-u_array, -v_array)), \
-                wind_direction_time, aux_wind['windspeed']
+        # 0 degrees meaning wind from North, 90 degrees meaning wind from East
+        return np.degrees(np.arctan2(-uu, -vv)), \
+                aux_wind.time_coverage_start, \
+                np.sqrt(np.power(uu, 2) + np.power(vv, 2))
 
-    def calculate_wind(self, wind_direction='ncep_wind_online',
-                        storeModelSpeed=True, eResampleAlg=1):
+    def _calculate_wind(self):
         '''
             Calculate wind speed from SAR sigma0 in VV polarization
         '''
-
-        # following checks should be simplified using 'WIND_DIRECTION_SOURCE'
-        # metadata
-        if isinstance(wind_direction, str):
-            wind_direction_array, wind_direction_time, model_windspeed = \
-                    self._get_wind_direction_array(
-                            self._get_aux_wind_from_str(wind_direction),
-                            eResampleAlg )
-        elif isinstance(wind_direction,Nansat):
-            wind_direction_array, wind_direction_time, model_windspeed = \
-                self._get_wind_direction_array( wind_direction, eResampleAlg )
-        elif isinstance(wind_direction, int):
-            wind_direction_array = self._check_wind_direction_array_dims(
-                    np.ones(self.shape())*wind_direction )
-        elif isinstance(wind_direction, np.ndarray):
-            wind_direction_array = self._check_wind_direction_array_dims(
-                    wind_direction )
-
-        if isinstance(wind_direction, int) or isinstance(wind_direction, np.ndarray):
-            wind_direction_time = None # Not relevant in this case
-            storeModelSpeed = False # Not available in this case
-
         # Calculate SAR wind with CMOD
         # TODO:
         # - add other CMOD versions than CMOD5
         print 'Calculating SAR wind with CMOD...'
         startTime = datetime.now()
+        try:
+            look_dir = self[self._get_band_number({'standard_name':
+                'sensor_azimuth_angle'})]
+        except:
+            raise Exception('Look direction is not available for SAR image.')
         windspeed = cmod5n_inverse(self[self.sigma0_bandNo],
-                            np.mod(wind_direction_array -
-                                self['SAR_look_direction'], 360),
+                            np.mod(self['winddirection'] - look_dir, 360),
                             self['incidence_angle'])
         print 'Calculation time: ' + str(datetime.now() - startTime)
 
         windspeed[np.where(np.isnan(windspeed))] = np.nan
         windspeed[np.where(np.isinf(windspeed))] = np.nan
 
-        ## NOTE: The following will cause a lot of added bands if the function
-        #        is repeated - consider changing method to only return data and
-        #        make another method that adds the bands
-
         # Add wind speed and direction as bands
         # TODO: make it possible to update existing bands... See
         # https://github.com/nansencenter/nansat/issues/58
+        wind_direction_time = self.get_metadata('time', 'winddirection')
         self.add_band(array=windspeed, parameters={
                         'wkv': 'wind_speed',
                         'name': 'windspeed',
                         'time': self.time_coverage_start,
                         'wind_direction_time': wind_direction_time
                 })
-        self.add_band(array=wind_direction_array, parameters={
-                            'wkv': 'wind_from_direction',
-                            'name': 'winddirection',
-                            'time': wind_direction_time
-                })
-
-        if storeModelSpeed:
-            self.add_band(array=model_windspeed, parameters={
-                            'wkv': 'wind_speed',
-                            'name': 'model_windspeed',
-                            'time': wind_direction_time,
-            })
 
         # TODO: Replace U and V bands with pixelfunctions
-        u = -windspeed*np.sin((180.0 - wind_direction_array)*np.pi/180.0)
-        v = windspeed*np.cos((180.0 - wind_direction_array)*np.pi/180.0)
+        u = -windspeed*np.sin((180.0 - self['winddirection'])*np.pi/180.0)
+        v = windspeed*np.cos((180.0 - self['winddirection'])*np.pi/180.0)
         self.add_band(array=u, parameters={
                             'wkv': 'eastward_wind',
                             'time': wind_direction_time,
@@ -303,7 +377,7 @@ class SARWind(Nansat, object):
         if landmask:
             try: # Land mask
                 sar_windspeed = np.ma.masked_where(
-                                    self.watermask()[1]==2, sar_windspeed)
+                                    self.watermask(tps=True)[1]==2, sar_windspeed)
                 palette.set_bad([.3, .3, .3], 1.0) # Land is masked (bad)
             except:
                 print 'Land mask not available'
@@ -317,7 +391,7 @@ class SARWind(Nansat, object):
                 except: # otherwise Thredds
                     ice = Nansat('metno_hires_seaice:' +
                             self.SAR_image_time.strftime('%Y%m%d'))
-                ice.reproject(self)
+                ice.reproject(self, tps=True)
                 iceBandNo = ice._get_band_number(
                     {'standard_name': 'sea_ice_area_fraction'})
                 sar_windspeed[ice[iceBandNo]>0] = -1
@@ -469,7 +543,7 @@ class SARWind(Nansat, object):
         nMap.pcolormesh(windspeedPcolor, **pcolormeshArgs)
 
         # apply landmask to windspeeds
-        windspeed = np.ma.masked_where(self.watermask()[1]==2, windspeed)
+        windspeed = np.ma.masked_where(self.watermask(tps=True)[1]==2, windspeed)
 
         # specify the number of quiver
         quiPixelSpacing = int(np.round(windspeed.shape[1]/numArrowsRange))
@@ -505,20 +579,33 @@ class SARWind(Nansat, object):
 
         nMap.save(fileName, landmask=landmask, **kwargs)
 
+    def export(self, *args, **kwargs):
+        bands = kwargs.pop('bands', None)
+        if not bands:
+            bands = [
+                    self._get_band_number('U'),
+                    self._get_band_number('V'),
+                    self._get_band_number('winddirection'),
+                    self._get_band_number('windspeed'),
+                ]
+            if self.has_band('model_windspeed'):
+                bands.append(self._get_band_number('model_windspeed'))
+        # TODO: add name of original file to metadata
+        super(SARWind, self).export(bands=bands, *args, **kwargs)
 
 
 ###################################
 #    If run from command line
 ###################################
-if __name__ == '__main__':
-
+def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', dest='SAR_filename',
-            required=True, help='SAR image filename')
+                        required=True, help='SAR image filename')
     parser.add_argument('-w', dest='wind_direction',
-            default='ncep_wind_online', help='Wind direction filename or constant '
-                ' (integer, 0 for wind from North, 90 for wind from East etc.). '
-                'Omit this argument for automatic download of NCEP GFS winds.')
+            default='ncep_wind_online',
+            help='Wind direction filename or constant '
+            ' (integer, 0 for wind from North, 90 for wind from East etc.). '
+            'Omit this argument for automatic download of NCEP GFS winds.')
     parser.add_argument('-n', dest='netCDF',
             help='Export numerical output to NetCDF file')
     parser.add_argument('-f', dest='figure_filename',
@@ -526,20 +613,20 @@ if __name__ == '__main__':
     parser.add_argument('-p', dest='pixelsize', default=500,
             help='Pixel size for SAR wind calculation (default = 500 m)',
                 type=float)
+    return parser
+
+
+if __name__ == '__main__':
+
+    parser = create_parser()
     args = parser.parse_args()
 
     if args.figure_filename is None and args.netCDF is None:
         raise ValueError('Please add filename of processed figure (-f) or' \
                 ' netcdf (-n)')
 
-    # Get wind direction
-    try:
-        wind_direction = int(args.wind_direction)
-    except:
-        wind_direction = args.wind_direction
-
     # Read SAR image
-    sw = SARWind(args.SAR_filename, wind_direction, pixelsize=args.pixelsize)
+    sw = SARWind(args.SAR_filename, args.wind_direction, pixelsize=args.pixelsize)
 
     # Save figure
     if args.figure_filename is not None:
@@ -548,8 +635,5 @@ if __name__ == '__main__':
 
     # Save as netCDF file
     if args.netCDF is not None:
-        print 'NetCDF export temporarily disabled'
-        print 'Waiting for Nansat #47:'
-        print 'https://github.com/nansencenter/nansat/issues/47'
-        #print 'Saving output to netCDF file: ' + args.netCDF
-        #sw.export_wind(args.netCDF)
+        print 'Saving output to netCDF file: ' + args.netCDF
+        sw.export(args.netCDF, bands=[6, 7])  # Exporting windspeed and dir

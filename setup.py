@@ -6,7 +6,7 @@
 # Modified:	Morten Wergeland Hansen
 #
 # Created:	19.11.2014
-# Last modified:04.12.2014 12:15
+# Last modified:04.12.2014 13:12
 # Copyright:    (c) NERSC
 # License:      GNU General Public License
 #-------------------------------------------------------------------------------
@@ -19,8 +19,8 @@ MAINTAINER_EMAIL    = "nansat-dev@googlegroups.com"
 DESCRIPTION         = "A python package for estimating high resolution wind from SAR images"
 LONG_DESCRIPTION    = "A python package for estimating high resolution wind from SAR images"
 MAJOR               = 0
-MINOR               = 6
-MICRO               = 2
+MINOR               = 7
+MICRO               = 0
 # Make sure to tag releases as "v%d.%d.%d" %(MAJOR, MINOR, MICRO)
 URL                 = "https://github.com/nansencenter/openwind"
 DOWNLOAD_URL        = "https://github.com/nansencenter/openwind/archive/v%d.%d.%d.tar.gz" %(MAJOR, MINOR, MICRO)
@@ -30,7 +30,7 @@ AUTHOR              = ("Morten W. Hansen, Knut-Frode Dagestad, Asuka Yamakawa")
 AUTHOR_EMAIL        = "nansat-dev@googlegroups.com"
 PLATFORMS           = ["UNKNOWN"]
 ISRELEASED          = False
-VERSION             = '%d.%d.%d' % (MAJOR, MINOR, MICRO) 
+VERSION             = '%d.%d-dev.%d' % (MAJOR, MINOR, MICRO) 
 REQS                = []
 
 import_error_msg = "OpenWind v%d.%d.%d requires %s, which should be installed separately"
@@ -39,7 +39,7 @@ import_error_msg = "OpenWind v%d.%d.%d requires %s, which should be installed se
 try:
     import nansat
 except ImportError:
-    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat v0.6.14'))
+    raise ImportError(import_error_msg %(MAJOR,MINOR,MICRO,'nansat'))
 
 #----------------------------------------------------------------------------#
 #                               Install package
