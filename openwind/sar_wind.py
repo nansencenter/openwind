@@ -23,7 +23,10 @@ except:
 
 from nansat.tools import OptionError
 from nansat.nansat import Nansat, Domain, _import_mappers
-from nansat.nansatmap import Nansatmap
+try:
+    from nansat.nansatmap import Nansatmap
+except ImportError:
+    warnings.warn('Nansatmap is removed from nansat, method save_wind_map_image will not work')
 from openwind.cmod5n import cmod5n_inverse
 
 class TimeDiffError(Exception):
