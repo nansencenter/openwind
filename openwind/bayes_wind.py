@@ -22,8 +22,8 @@ from openwind.sar_wind import SARWind
 
 
 def cost_function(apriori, obs, err):
-    """  Return the cost function of `obs` with uncertainty `err` defined in the
-    domain of `apriori`
+    """  Return the cost function of <obs> with uncertainty <err> defined in the
+    domain of <apriori>
     """
     # NOTE: This function should be written in c (probably using numpy
     # libraries) to improve execution speed
@@ -35,10 +35,25 @@ def cost_function(apriori, obs, err):
 
 def window_std(arr, radius):
     # TODO: Add documentation to <window_std>
-    """standard deviation on sliding windows
+    """Standard deviation of the pixels located in the neighborhood of the pixel.
 
-    Code extract from
-    http://stackoverflow.com/questions/18419871/improving-code-efficiency-standard-deviation-on-sliding-windows
+    Parameters
+    ----------
+        # TODO: Specify type (float?)
+        arr: numpy.array
+
+        radius: int
+            Size of the window i.e. number of pixels around the central pixel
+
+    Returns
+    -------
+        # TODO: Specify return
+
+    See Also
+    --------
+        Code extract from
+        http://stackoverflow.com/questions/18419871/improving-code-efficiency-standard
+        -deviation-on-sliding-windows
     """
     c1 = uniform_filter(arr, radius * 2, mode='constant', origin=-radius)
     c2 = uniform_filter(arr * arr, radius * 2, mode='constant', origin=-radius)
@@ -77,7 +92,7 @@ class BayesianWind(SARWind):
     resample_alg = 1
 
     def __init__(self, filename, doppler_file='', *args, **kwargs):
-
+        # TODO: separate calculations between U and V
         super(BayesianWind, self).__init__(filename, *args, **kwargs)
 
         u_apriori, v_apriori = np.meshgrid(self.wind_speed_range, self.wind_speed_range)
@@ -158,6 +173,7 @@ class BayesianWind(SARWind):
         sar_look = self[self._get_band_number({'standard_name': 'sensor_azimuth_angle'})]
         inci = self['incidence_angle']
 
+        # TODO: speed up processing
         print('Applying Bayesian on one-by-one pixel')
         for i in range(imshape[0]):
             print 'Row %d of %d' % (i + 1, imshape[0])
@@ -177,8 +193,8 @@ class BayesianWind(SARWind):
                 cost_model_v = cost_function(v_apriori, model_v[i, j], err_v[i, j])
 
                 # Calculate sigma0 cost function
-                cmod_s0 = cmod5n_forward(speed_apriori, direction_apriori-sar_look[i, j],
-                                         np.ones(np.shape(speed_apriori))*inci[i, j])
+                cmod_s0 = cmod5n_forward(speed_apriori, direction_apriori - sar_look[i, j],
+                                         np.ones(np.shape(speed_apriori)) * inci[i, j])
                 cost_sigma0 = cost_function(cmod_s0, s0[i, j], err_s0[i, j])
 
                 cost = cost_model_v + cost_model_u + cost_sigma0
