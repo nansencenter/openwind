@@ -13,7 +13,8 @@ C = [0, -0.6878, -0.7957, 0.3380, -0.1728, 0.0000, 0.0040, 0.1103, 0.0159, 6.732
 
 def cmod5n_forward(v, phi, theta):
     """cmod5n_forward(v, phi, theta)
-    Parameters:
+    Parameters
+    ----------
         v: float, numpy.array
             2D array with wind velocities in [m/s] (always >= 0)
         phi: float, numpy.array
@@ -21,7 +22,8 @@ def cmod5n_forward(v, phi, theta):
         theta: float, numpy.array
             2D array with incidence angles in [deg]
 
-    Returns:
+    Returns
+    -------
         cmod_n: float, numpy.array
             2D array with normalized backscatter (linear)
 
@@ -29,8 +31,6 @@ def cmod5n_forward(v, phi, theta):
     H. Hersbach, A. Stoffelen, and S. de Haan. 2007. An improved C-band scatterometer ocean
     geophysical model function: CMOD5. Journal of Geophysical Research, Vol. 112, C03006,
     doi:10.1029/2006JC003743
-
-    Access: http://onlinelibrary.wiley.com/doi/10.1029/2006JC003743/full
 
     A. STOFFELEN              MAY  1991 ECMWF  CMOD4
     A. STOFFELEN, S. DE HAAN  DEC  2001 KNMI   CMOD5 PROTOTYPE

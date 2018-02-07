@@ -92,9 +92,11 @@ class BayesianWind(SARWind):
     resample_alg = 1
 
     def __init__(self, filename, doppler_file='', *args, **kwargs):
-        # TODO: separate calculations between U and V
+        # TODO: What is a reason?
         super(BayesianWind, self).__init__(filename, *args, **kwargs)
+        # TODO: separate calculations between U and V
 
+        # Set apriori (0 step) distribution of the wind field
         u_apriori, v_apriori = np.meshgrid(self.wind_speed_range, self.wind_speed_range)
         direction_apriori = 180./np.pi*np.arctan2(u_apriori, v_apriori)  # 0 is wind towards North
         speed_apriori = np.sqrt(np.square(u_apriori) + np.square(v_apriori))
@@ -104,6 +106,7 @@ class BayesianWind(SARWind):
         # function go? anyway, the below should be equally fine..
         model_wind = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'))
 
+        # TODO: Move to separate function
         if doppler_file:
             # Get Nansat object of the range Doppler shift
             dop = Nansat(doppler_file)
