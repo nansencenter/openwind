@@ -17,7 +17,8 @@ class Mapper(NetcdfCF):
         quartile = kwargs.pop('quartile', 0)
 
         metadata = args[2]
-        if not metadata['NC_GLOBAL#source'].lower() == 'quikscat':
+        if not metadata.has_key('NC_GLOBAL#source') \
+                or not metadata['NC_GLOBAL#source'].lower() == 'quikscat':
             raise WrongMapperError
 
         super(Mapper, self).__init__(*args, **kwargs)
@@ -74,7 +75,6 @@ class Mapper(NetcdfCF):
         # Add geolocation from correct longitudes and latitudes
         self._add_geolocation(Geolocation(self.band_vrts['new_lon_VRT'], self, 1, lat_band_num)) # band numbers are hardcoded...
         
-        # TODO: check if metadata is gone 
 
         # TODO: add GCMD/DIF metadata
 
@@ -92,7 +92,6 @@ class Mapper(NetcdfCF):
 
         lat = gdal.Open(fn[0])
 
-        super(NetcdfCF, self).__init__(lat.RasterXSize, lat.RasterYSize) # from full size
-        #VRT.__init__(self)
+        super(NetcdfCF, self).__init__(lat.RasterXSize, lat.RasterYSize, metadata=gdal_metadata)
 
         
