@@ -62,10 +62,6 @@ class Mapper(NetcdfCF):
         dst = {'wkv': 'longitude',
                'name': 'lon_corrected'}
 
-        # Blow up to full size
-        # Add new longitude band
-        #self.create_band(src, dst)
-
         # Find latitude band number
         fn = self.sub_filenames(args[1])
         lat_band_num = [ii for ii, ll in enumerate(fn) if ':lat' in ll][0] + 1
@@ -73,10 +69,14 @@ class Mapper(NetcdfCF):
         self.dataset.SetProjection(NSR().wkt)
         #self.dataset.SetGeoTransform((0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
-        self.dataset.SetGCPs(VRT._lonlat2gcps(lon, lat, **kwargs), NSR().wkt)
+        self.dataset.SetGCPs(VRT._lonlat2gcps(lon, lat, n_gcps=400), NSR().wkt)
 
         # Add geolocation from correct longitudes and latitudes
         self._add_geolocation(Geolocation(self.band_vrts['new_lon_VRT'], self, 1, lat_band_num)) # band numbers are hardcoded...
+        
+        # TODO: check if metadata is gone 
+
+        # TODO: add GCMD/DIF metadata
 
     def _create_empty(self, gdal_dataset, gdal_metadata):
         fn = self.sub_filenames(gdal_dataset)
