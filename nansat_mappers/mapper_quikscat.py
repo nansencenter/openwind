@@ -1,5 +1,6 @@
 import json
 import numpy as np
+from datetime import datetime
 import pythesint as pti
 
 import gdal
@@ -33,19 +34,37 @@ class Mapper(NetcdfCF):
         # Crop
         self.set_offset_size('y', y_offset, y_size)
 
-        # Remove GCPs 
-        #self.dataset.SetGCPs([],'')
+        # Create band of times
+        # TODO: resolve nansat issue #263 (https://github.com/nansencenter/nansat/issues/263)
+        tt = self.times()[y_offset : y_offset + y_size]
+        self.dataset.SetMetadataItem('time_coverage_start', tt[0].astype(datetime).isoformat())
+        self.dataset.SetMetadataItem('time_coverage_end', tt[-1].astype(datetime).isoformat())
+        time_stamps = (tt - tt[0]) / np.timedelta64(1, 's')
+        self.band_vrts['time'] = VRT.from_array(
+                np.tile(time_stamps, (self.dataset.RasterXSize, 1)).transpose()
+            )
+        self.create_band(
+                src = {
+                    'SourceFilename': self.band_vrts['time'].filename,
+                    'SourceBand': 1,
+                },
+                dst = {
+                    'name': 'timestamp', 
+                    'time_coverage_start': tt[0].astype(datetime).isoformat(), 
+                    'units': 'seconds since time_coverage_start',
+                }
+            )
+
         # Set projection to wkt
         self.dataset.SetProjection(NSR().wkt)
 
-
-        band_lat = self.dataset.GetRasterBand(1)
-        # Check that it is actually longitudes
+        band_lat = self.dataset.GetRasterBand(self._latitude_band_number())
+        # Check that it is actually latitudes
         if not band_lat.GetMetadata()['standard_name'] == 'latitude':
             raise ValueError('Cannot find latitude band')
         lat = band_lat.ReadAsArray()
 
-        band_lon = self.dataset.GetRasterBand(2)
+        band_lon = self.dataset.GetRasterBand(self._longitude_band_number())
         # Check that it is actually longitudes
         if not band_lon.GetMetadata()['standard_name'] == 'longitude':
             raise ValueError('Cannot find longitude band')
@@ -58,40 +77,25 @@ class Mapper(NetcdfCF):
         lon = np.mod(lon+180., 360.) - 180.
 
         self.band_vrts['new_lon_VRT'] = VRT.from_array(lon)
-        src = {'SourceFilename': self.band_vrts['new_lon_VRT'].filename,
-               'SourceBand': 1}
-        dst = {'wkv': 'longitude',
-               'name': 'lon_corrected'}
-
-        # Find latitude band number
-        fn = self.sub_filenames(args[1])
-        lat_band_num = [ii for ii, ll in enumerate(fn) if ':lat' in ll][0] + 1
 
         self.dataset.SetProjection(NSR().wkt)
-        #self.dataset.SetGeoTransform((0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
 
         self.dataset.SetGCPs(VRT._lonlat2gcps(lon, lat, n_gcps=400), NSR().wkt)
 
         # Add geolocation from correct longitudes and latitudes
-        self._add_geolocation(Geolocation(self.band_vrts['new_lon_VRT'], self, 1, lat_band_num)) # band numbers are hardcoded...
-        
+        self._add_geolocation(Geolocation(self.band_vrts['new_lon_VRT'], self, 1,
+            self._latitude_band_number())) # band numbers are hardcoded...
 
         # TODO: add GCMD/DIF metadata
 
+    def _latitude_band_number(self):
+        return [ii for ii, ll in enumerate(self.sub_filenames()) if ':lat' in ll][0] + 1
+
+    def _longitude_band_number(self):
+        return [ii for ii, ll in enumerate(self.sub_filenames()) if ':lon' in ll][0] + 1
+
     def _create_empty(self, gdal_dataset, gdal_metadata):
-        fn = self.sub_filenames(gdal_dataset)
-        if not fn:
-            raise WrongMapperError
-        #latfn = [ll for ll in fn if ':lat' in ll][0]
-        #lonfn = [ll for ll in fn if ':lon' in ll][0]
-        # This may destroy things..
-        #lon = np.mod(gdal.Open(lonfn).ReadAsArray() + 180, 360) - 180
-        #lon = gdal.Open(lonfn).ReadAsArray()
-        #lat = gdal.Open(latfn).ReadAsArray()
-        #self._init_from_lonlat(lon, lat)
-
-        lat = gdal.Open(fn[0])
-
+        lat = gdal.Open(self.sub_filenames()[self._latitude_band_number()])
         super(NetcdfCF, self).__init__(lat.RasterXSize, lat.RasterYSize, metadata=gdal_metadata)
 
         
