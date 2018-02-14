@@ -14,15 +14,14 @@ from nansat.exceptions import WrongMapperError
 
 class Mapper(NetcdfCF):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, filename, gdal_dataset, metadata, *args, **kwargs):
         quartile = kwargs.pop('quartile', 0)
 
-        metadata = args[2]
         if not metadata.has_key('NC_GLOBAL#source') \
                 or not metadata['NC_GLOBAL#source'].lower() == 'quikscat':
             raise WrongMapperError
 
-        super(Mapper, self).__init__(*args, **kwargs)
+        super(Mapper, self).__init__(filename, gdal_dataset, metadata, *args, **kwargs)
         
         intervals = [0,1,2,3]
         if not quartile in intervals:
@@ -58,13 +57,13 @@ class Mapper(NetcdfCF):
         # Set projection to wkt
         self.dataset.SetProjection(NSR().wkt)
 
-        band_lat = self.dataset.GetRasterBand(self._latitude_band_number())
+        band_lat = self.dataset.GetRasterBand(self._latitude_band_number(gdal_dataset))
         # Check that it is actually latitudes
         if not band_lat.GetMetadata()['standard_name'] == 'latitude':
             raise ValueError('Cannot find latitude band')
         lat = band_lat.ReadAsArray()
 
-        band_lon = self.dataset.GetRasterBand(self._longitude_band_number())
+        band_lon = self.dataset.GetRasterBand(self._longitude_band_number(gdal_dataset))
         # Check that it is actually longitudes
         if not band_lon.GetMetadata()['standard_name'] == 'longitude':
             raise ValueError('Cannot find longitude band')
@@ -83,19 +82,31 @@ class Mapper(NetcdfCF):
         self.dataset.SetGCPs(VRT._lonlat2gcps(lon, lat, n_gcps=400), NSR().wkt)
 
         # Add geolocation from correct longitudes and latitudes
-        self._add_geolocation(Geolocation(self.band_vrts['new_lon_VRT'], self, 1,
-            self._latitude_band_number())) # band numbers are hardcoded...
+        self._add_geolocation(
+                Geolocation(self.band_vrts['new_lon_VRT'], self, x_band=1, y_band=self._latitude_band_number(gdal_dataset))
+            )
 
-        # TODO: add GCMD/DIF metadata
+        # Get dictionary describing the instrument and platform according to
+        # the GCMD keywords
+        mm = pti.get_gcmd_instrument('seawinds')
+        ee = pti.get_gcmd_platform('quikscat')
 
-    def _latitude_band_number(self):
-        return [ii for ii, ll in enumerate(self.sub_filenames()) if ':lat' in ll][0] + 1
+        # TODO: Validate that the found instrument and platform are indeed what
+        # we want....
 
-    def _longitude_band_number(self):
-        return [ii for ii, ll in enumerate(self.sub_filenames()) if ':lon' in ll][0] + 1
+        self.dataset.SetMetadataItem('instrument', json.dumps(mm))
+        self.dataset.SetMetadataItem('platform', json.dumps(ee))
+
+    def _latitude_band_number(self, gdal_dataset):
+        return [ii for ii, ll in enumerate(self._get_sub_filenames(gdal_dataset)) if ':lat' in ll][0] + 1
+
+    def _longitude_band_number(self, gdal_dataset):
+        return [ii for ii, ll in enumerate(self._get_sub_filenames(gdal_dataset)) if ':lon' in ll][0] + 1
 
     def _create_empty(self, gdal_dataset, gdal_metadata):
-        lat = gdal.Open(self.sub_filenames()[self._latitude_band_number()])
+        lat = gdal.Open(
+                self._get_sub_filenames(gdal_dataset)[self._latitude_band_number(gdal_dataset)]
+            )
         super(NetcdfCF, self).__init__(lat.RasterXSize, lat.RasterYSize, metadata=gdal_metadata)
 
         
