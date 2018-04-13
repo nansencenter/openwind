@@ -13,12 +13,18 @@
 import numpy as np
 from scipy.interpolate import griddata
 from scipy.ndimage.filters import uniform_filter
+from scipy.signal import medfilt2d
 
 from nansat.nansat import Nansat
+from nansat.domain import Domain
+from nansat.nsr import NSR
 
 from openwind.cmod5n import cmod5n_forward
 from openwind.cdop import cdop
 from openwind.sar_wind import SARWind
+
+from geospaas.utils import nansat_filename
+from geospaas.catalog.models import Dataset
 
 def cost_function(apriori, obs, err):
     ''' 
@@ -63,21 +69,33 @@ def grid_based_uncertainty(arr, radius):
 
     return err[:,incr:-incr]
 
+def LL2XY(EPSG, lon, lat):
+    point = ogr.Geometry(ogr.wkbPoint)
+    point.AddPoint(lon, lat)
+    inSpatialRef = osr.SpatialReference()
+    inSpatialRef.ImportFromEPSG(4326)
+    outSpatialRef = osr.SpatialReference()
+    outSpatialRef.ImportFromEPSG(EPSG)
+    coordTransform = osr.CoordinateTransformation(inSpatialRef,
+                            outSpatialRef)
+    point.Transform(coordTransform)
+    return point.GetX(), point.GetY()
+
 class BayesianWind(SARWind):
-    wind_speed_range = np.linspace(-20,20,81)
-    model_err = 1.5 # alternatively using method grid_based_uncertainty
-    doppler_err = 5
+    WIND_SPEED_RANGE = np.linspace(-20,20,81)
+    MODEL_ERR = 1.5 # alternatively using method grid_based_uncertainty
+    DOPPLER_ERR = 5
     # s0 error: use variance within grid cell (going from full res to, e.g.,
     # 500m) - this should not be constant..
-    s0_err_fac = 0.078 # Portabella et al. (1998, 2002)
-    resample_alg = 1
+    S0_ERR_FAC = 0.078 # Portabella et al. (1998, 2002)
+    RESAMPLE_ALG = 1
 
-    def __init__(self, filename, doppler_file='', *args, **kwargs):
+    def __init__(self, filename, doppler_dataset=None, *args, **kwargs):
 
         super(BayesianWind, self).__init__(filename, *args, **kwargs)
 
-        [u_apriori, v_apriori] = np.meshgrid(self.wind_speed_range,
-                self.wind_speed_range)
+        [u_apriori, v_apriori] = np.meshgrid(self.WIND_SPEED_RANGE,
+                self.WIND_SPEED_RANGE)
         direction_apriori = 180./np.pi*np.arctan2(u_apriori, v_apriori) # 0 is wind towards North
         speed_apriori = np.sqrt(np.square(u_apriori) + np.square(v_apriori))
 
@@ -86,36 +104,62 @@ class BayesianWind(SARWind):
         # function go? anyway, the below should be equally fine..
         model_wind = Nansat(self.get_metadata('WIND_DIRECTION_SOURCE'))
 
-        if doppler_file:
-            # Get Nansat object of the range Doppler shift
-            dop = Nansat(doppler_file)
-            # Estimate Doppler uncertainty
-            fdg = dop['dop_coef_observed'] - dop['dop_coef_predicted'] - \
-                    dop['range_bias_scene'] - dop['azibias']
-            fdg[fdg>100] = np.nan
-            fdg[fdg<-100] = np.nan
-            mask = np.isnan(fdg)
-            fdg[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask),
+        if doppler_dataset:
+            nc_uris = doppler_dataset.dataseturi_set.filter(uri__endswith='.nc')
+            fdg_tot = np.ones((len(nc_uris),self.shape()[0],self.shape()[1])) * np.nan
+            fdg_err = np.ones((len(nc_uris),self.shape()[0],self.shape()[1])) * np.nan
+            for ii, nc_uri in enumerate(nc_uris):
+                fn = nansat_filename(nc_uri.uri)
+                nn = Nansat(fn)
+                fdg = nn['fdg']
+                # Set invalid to nan...
+                val = nn['valid_doppler']
+                fdg[val==0]==np.nan
+                # Estimate Doppler uncertainty
+                fdg[fdg>100] = np.nan
+                fdg[fdg<-100] = np.nan
+                mask = np.isnan(fdg)
+                fdg[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask),
                     fdg[~mask])
-            err_fdg = grid_based_uncertainty(fdg,2)
-            err_fdg[err_fdg<self.doppler_err]=self.doppler_err
-            dop.add_band(array=err_fdg, parameters={'name':'err_fdg'})
-            dop.reproject(self, eResampleAlg=self.resample_alg, tps=True)
-            fdg = dop['dop_coef_observed'] - dop['dop_coef_predicted'] - \
-                    dop['range_bias_scene'] - dop['azibias']
-            err_fdg = dop['err_fdg']
-            #fdg_err = dop['range_bias_std_scene'] - this is not the uncertainty...
-        
+                err_fdg = grid_based_uncertainty(fdg,2)
+                err_fdg[err_fdg<self.DOPPLER_ERR]=self.DOPPLER_ERR
+                nn.add_band(array=err_fdg, parameters={'name':'err_fdg'})
+                nn.reproject(self, eResampleAlg=self.RESAMPLE_ALG, tps=True)
+                fdg = nn['fdg']
+                val = nn['valid_doppler']
+                # Set invalid to nan...
+                fdg[val==0]==np.nan
+                fdg_tot[ii] = fdg
+                fdg_err[ii] = nn['err_fdg']
+            
+            fdg_tot = np.nanmedian(fdg_tot,axis=0)
+            # Do 2D spatial filtering... May perhaps be removed...
+            fdg_tot = medfilt2d(fdg_tot)
+            fdg_err = np.nanmedian(fdg_err,axis=0)
+            fdg_err[fdg_tot<-100] = np.nan
+            fdg_err[fdg_tot>100] = np.nan
+            fdg_tot[fdg_tot<-100] = np.nan
+            fdg_tot[fdg_tot>100] = np.nan
+            #      - check cdop vs fdg
+            fcdop = cdop(
+                    self['model_windspeed'], 
+                    np.mod(np.abs(self['look_direction']-self['winddirection']), 360),
+                    self['incidence_angle'],
+                    self.get_metadata(band_id=self.get_band_number({'standard_name':
+                        'surface_backwards_scattering_coefficient_of_radar_wave'}),
+                        key='polarization')
+                )
+
         # Estimate sigma0 uncertainty
         s0 = self['sigma0_VV']
-        err_s0 = self.s0_err_fac*s0
+        err_s0 = self.S0_ERR_FAC*s0
         #    #mask = np.isnan(fdg)
         #    #fdg[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask),
         #    #        fdg[~mask])
         #err_s0 = grid_based_uncertainty(s0,2)
         #import ipdb
         #ipdb.set_trace()
-        #err_s0[err_s0<self.s0_err_fac*s0] = self.s0_err_fac*s0[err_s0<self.s0_err_fac*s0]
+        #err_s0[err_s0<self.S0_ERR_FAC*s0] = self.S0_ERR_FAC*s0[err_s0<self.S0_ERR_FAC*s0]
 
         # Estimate model wind uncertainty (leads to adjustment near fronts)
         #model_px_resolution = int(np.round( 2 * model_wind.get_pixelsize_meters()[0] /
@@ -129,15 +173,15 @@ class BayesianWind(SARWind):
         model_wind.add_band(array=err_v, parameters={'name':'err_v'})
 
         # Reproject to SAR image
-        model_wind.reproject(self, eResampleAlg=self.resample_alg, tps=True)
+        model_wind.reproject(self, eResampleAlg=self.RESAMPLE_ALG, tps=True)
 
         # Get uncertainties in model wind  
         err_u = model_wind['err_u']
         # Without the below, uncertainties are lower in uniform areas - this
         # should be quite reasonable...
-        #err_u[err_u<self.model_err] = self.model_err
+        #err_u[err_u<self.MODEL_ERR] = self.MODEL_ERR
         err_v = model_wind['err_v']
-        #err_v[err_v<self.model_err] = self.model_err
+        #err_v[err_v<self.MODEL_ERR] = self.MODEL_ERR
 
         # Assign shape of SAR image to variable imshape
         imshape = self.shape()
@@ -184,17 +228,16 @@ class BayesianWind(SARWind):
                 ub_modcmod[i,j] = u_apriori[ind_min]
                 vb_modcmod[i,j] = v_apriori[ind_min]
 
-                if (doppler_file and 
-                        fdg[i,j]>-100 and 
-                        fdg[i,j]<100 and 
-                        err_fdg[i,j]!=0 and
-                        not np.isnan(err_fdg[i,j])):
+                if (doppler_dataset and 
+                        not np.isnan(fdg_tot[i,j]) and 
+                        fdg_err[i,j]!=0 and
+                        not np.isnan(fdg_err[i,j])):
                     # Calculate Doppler cost function
                     self.has_doppler[i,j] = 1
                     cdop_fdg = cdop(speed_apriori, 
-                        sar_look[i,j]-direction_apriori,
+                        np.mod(np.abs(sar_look[i,j]-direction_apriori), 360),
                         np.ones(np.shape(speed_apriori))*inci[i,j], 'VV')
-                    cost_doppler = cost_function(cdop_fdg, fdg[i,j], err_fdg[i,j])
+                    cost_doppler = cost_function(cdop_fdg, fdg_tot[i,j], fdg_err[i,j])
                     cost += cost_doppler
 
                     ind_min = np.where(cost==np.min(cost,axis=None))
@@ -222,7 +265,26 @@ class BayesianWind(SARWind):
                 'long_name': 'Bayesian wind direction using model and ' \
                         'cmod data'}
             )
-        if doppler_file:
+        if doppler_dataset:
+            self.add_band(
+                array = fdg_tot,
+                parameters={
+                    'wkv': 'surface_backwards_doppler_frequency_shift_of_radar_wave_due_to_surface_velocity',
+                    }
+                )
+            self.add_band(
+                array = fdg_err,
+                parameters={
+                    'name': 'fdg_err',
+                    }
+                )
+            self.add_band(
+                array = fcdop,
+                parameters={
+                    'wkv': 'surface_backwards_doppler_frequency_shift_of_radar_wave_due_to_wind_waves',
+                    'note': 'based on model wind'
+                    }
+                )
             self.add_band(
                 array = np.sqrt(np.square(ub_all) + np.square(vb_all)),
                 parameters={
@@ -238,3 +300,23 @@ class BayesianWind(SARWind):
                     'name': 'bdir_all',
                     'long_name': 'Bayesian wind direction using all data'}
                 )
+
+    def export(self, *args, **kwargs):
+        bands = kwargs.pop('bands', None)
+        if not bands:
+            bands = [
+                    self.get_band_number('sigma0_VV'), 
+                    self.get_band_number('model_windspeed'),
+                    self.get_band_number('winddirection'), 
+                    self.get_band_number('windspeed'),
+                    self.get_band_number('bspeed_modcmod'), 
+                    self.get_band_number('bdir_modcmod'),
+                ]
+            if self.has_band('fdg'):
+                bands.append(self.get_band_number('fdg'))
+                bands.append(self.get_band_number('fdg_err'))
+                bands.append(self.get_band_number('fww'))
+                bands.append(self.get_band_number('bspeed_all'))
+                bands.append(self.get_band_number('bdir_all'))
+        # TODO: add name of original file to metadata
+        super(SARWind, self).export(bands=bands, *args, **kwargs)
