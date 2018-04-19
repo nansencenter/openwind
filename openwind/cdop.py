@@ -54,7 +54,7 @@ def cdop(u10, phi, inc, pol):
         Return
         -----------
         dop : numpy.array
-              Estimated Doppler shift [Hz]
+              Estimated Doppler shift [Hz] positive for surface motion toward the radar
     '''
     # Check inputs
     sizes = np.array([np.size(inc), np.size(u10), np.size(phi)])
