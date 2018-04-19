@@ -96,7 +96,8 @@ class BayesianWind(SARWind):
 
         [u_apriori, v_apriori] = np.meshgrid(self.WIND_SPEED_RANGE,
                 self.WIND_SPEED_RANGE)
-        direction_apriori = 180./np.pi*np.arctan2(u_apriori, v_apriori) # 0 is wind towards North
+        # 0 degrees is wind from North
+        direction_apriori = (180./np.pi*np.arctan2(u_apriori, v_apriori) + 180.) % 360
         speed_apriori = np.sqrt(np.square(u_apriori) + np.square(v_apriori))
 
         # Get Nansat object of the model wind field
@@ -111,9 +112,22 @@ class BayesianWind(SARWind):
             for ii, nc_uri in enumerate(nc_uris):
                 fn = nansat_filename(nc_uri.uri)
                 nn = Nansat(fn)
-                fdg = nn['fdg']
+                try:
+                    fdg = nn['fdg']
+                    val = nn['valid_doppler']
+                except ValueError:
+                    val = nn['valid_scene']
+                    dcp=nn['dop_coef_predicted']
+                    dc=nn['dop_coef_observed']
+                    rb=nn['range_bias_scene']
+                    az=nn['azibias']
+                    dc[dc>10000]=np.nan
+                    dcp[dcp>10000]=np.nan
+                    rb[rb>10000]=np.nan
+                    az[az>10000]=np.nan
+                    fdg = -(dc - dcp - rb - az)
+
                 # Set invalid to nan...
-                val = nn['valid_doppler']
                 fdg[val==0]==np.nan
                 # Estimate Doppler uncertainty
                 fdg[fdg>100] = np.nan
@@ -125,8 +139,23 @@ class BayesianWind(SARWind):
                 err_fdg[err_fdg<self.DOPPLER_ERR]=self.DOPPLER_ERR
                 nn.add_band(array=err_fdg, parameters={'name':'err_fdg'})
                 nn.reproject(self, eResampleAlg=self.RESAMPLE_ALG, tps=True)
-                fdg = nn['fdg']
-                val = nn['valid_doppler']
+                try:
+                    fdg = nn['fdg']
+                    val = nn['valid_doppler']
+                except ValueError:
+                    val = nn['valid_scene']
+                    dcp=nn['dop_coef_predicted']
+                    dc=nn['dop_coef_observed']
+                    rb=nn['range_bias_scene']
+                    az=nn['azibias']
+                    dc[dc>10000]=np.nan
+                    dcp[dcp>10000]=np.nan
+                    rb[rb>10000]=np.nan
+                    az[az>10000]=np.nan
+                    # TODO: check sign conventions for old doppler - this may be wrong for
+                    # descending pass...
+                    fdg = -(dc - dcp - rb - az)
+
                 # Set invalid to nan...
                 fdg[val==0]==np.nan
                 fdg_tot[ii] = fdg
@@ -199,6 +228,12 @@ class BayesianWind(SARWind):
         sar_look = self[self._get_band_number({'standard_name':
                 'sensor_azimuth_angle'})]
         inci = self['incidence_angle']
+        pol = self.get_metadata(
+            band_id=self.get_band_number({
+                'standard_name': 'surface_backwards_scattering_coefficient_of_radar_wave'
+                }), 
+            key='polarization')
+        # TODO: Try to increase speed using numba or cython..
         print 'Applying Bayesian on one-by-one pixel'
         for i in range(imshape[0]):
             print 'Row %d of %d'%(i+1,imshape[0])
@@ -228,6 +263,14 @@ class BayesianWind(SARWind):
                 ub_modcmod[i,j] = u_apriori[ind_min]
                 vb_modcmod[i,j] = v_apriori[ind_min]
 
+                speedij = np.sqrt( np.square(ub_modcmod[i,j]) 
+                        + np.square(vb_modcmod[i,j]) )
+                # The Doppler will not be good for low wind speeds when the 
+                # NRCS is small - this is a simple way to filter out that data.
+                # TODO: improve method to mask pixels in sardoppler.py
+                if speedij < 3:
+                    fdg_tot[i,j] = np.nan
+
                 if (doppler_dataset and 
                         not np.isnan(fdg_tot[i,j]) and 
                         fdg_err[i,j]!=0 and
@@ -236,14 +279,19 @@ class BayesianWind(SARWind):
                     self.has_doppler[i,j] = 1
                     cdop_fdg = cdop(speed_apriori, 
                         np.mod(np.abs(sar_look[i,j]-direction_apriori), 360),
-                        np.ones(np.shape(speed_apriori))*inci[i,j], 'VV')
+                        np.ones(np.shape(speed_apriori))*inci[i,j],
+                        pol
+                    )
                     cost_doppler = cost_function(cdop_fdg, fdg_tot[i,j], fdg_err[i,j])
                     cost += cost_doppler
 
                     ind_min = np.where(cost==np.min(cost,axis=None))
                     ub_all[i,j] = u_apriori[ind_min]
                     vb_all[i,j] = v_apriori[ind_min]
-
+                else:
+                    # Set result to that of model and cmod result
+                    ub_all[i,j] = ub_modcmod[i,j]
+                    vb_all[i,j] = vb_modcmod[i,j]
 
                 # Should give uncertainties as well
                 #self.rms_u[i,j] = err_u[i,j] + err_v[i,j] + ...
