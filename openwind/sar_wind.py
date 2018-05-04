@@ -138,7 +138,7 @@ class SARWind(Nansat, object):
                          3 : CubicSpline,
                          4 : Lancoz
         '''
-        if isinstance(wind_direction, str):
+        if isinstance(wind_direction, str) or isinstance(wind_direction, unicode):
             wdir, wdir_time, wspeed = self._get_aux_wind_from_str(
                                         wind_direction, *args, **kwargs)
 
