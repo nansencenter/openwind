@@ -290,8 +290,8 @@ class BayesianWind(SARWind):
                     vb_all[i,j] = v_apriori[ind_min]
                 else:
                     # Set result to that of model and cmod result
-                    ub_all[i,j] = ub_modcmod[i,j]
-                    vb_all[i,j] = vb_modcmod[i,j]
+                    ub_all[i,j] = np.nan #ub_modcmod[i,j]
+                    vb_all[i,j] = np.nan #vb_modcmod[i,j]
 
                 # Should give uncertainties as well
                 #self.rms_u[i,j] = err_u[i,j] + err_v[i,j] + ...
