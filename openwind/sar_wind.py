@@ -38,7 +38,7 @@ class SARWind(Nansat, object):
     '''
 
     def __init__(self, sar_image, wind_direction='ncep_wind_online',
-                    band_name=None, pixelsize=500, eResampleAlg=1, *args,
+                    band_name=None, pixelsize=500, resample_alg=1, *args,
                     **kwargs):
         '''
             Parameters
@@ -59,7 +59,7 @@ class SARWind(Nansat, object):
                         - a Nansat object with wind direction.
             pixel_size : float or int
                         Grid pixel size in metres
-            eResampleAlg : int
+            resample_alg : int
                         Resampling algorithm used for reprojecting wind field
                         to SAR image
                             -1 : Average,
@@ -100,7 +100,7 @@ class SARWind(Nansat, object):
             self.resize(pixelsize=pixelsize)
 
         if not self.has_band('winddirection'):
-            self.set_aux_wind(wind_direction, eResampleAlg=eResampleAlg,
+            self.set_aux_wind(wind_direction, resample_alg=resample_alg,
                     **kwargs)
 
         # If this is a netcdf file with already calculated windspeed (e.g.
@@ -128,7 +128,7 @@ class SARWind(Nansat, object):
                         file (online or on local disk) matching the SAR
                         image time [DEFAULT: 'ncep_wind_online']
                     - a Nansat object with wind direction.
-        eResampleAlg : int
+        resample_alg : int
                     Resampling algorithm used for reprojecting wind field
                     to SAR image
                         -1 : Average,
@@ -212,7 +212,7 @@ class SARWind(Nansat, object):
                             'standard_name': 'x_wind',
                         })
             self.set_metadata('WIND_DIRECTION_SOURCE',
-                   aux.get_metadata(bandID=wind_u_bandNo)['SourceFilename'])
+                   aux.get_metadata(band_id=wind_u_bandNo)['SourceFilename'])
             wdir, wdir_time, wspeed = self._get_wind_direction_array(aux,
                                         *args, **kwargs)
 
@@ -227,7 +227,7 @@ class SARWind(Nansat, object):
                         'must have the same shape as the SAR NRCS')
         return
 
-    def _get_wind_direction_array(self, aux_wind, eResampleAlg=1, *args,
+    def _get_wind_direction_array(self, aux_wind, resample_alg=1, *args,
             **kwargs):
         '''
             Reproject wind and return the wind directions, time and speed
@@ -271,14 +271,14 @@ class SARWind(Nansat, object):
         # Then reproject
         # OBS: issue #29, test:
         # openwind_integration_tests.test_sentinel1.S1Test.test_s1aEW_with_arome_arctic
-        aux_wind.reproject(self, eResampleAlg=eResampleAlg, tps=True)
+        aux_wind.reproject(self, resample_alg=resample_alg, tps=True)
 
         if not self.get_metadata().has_key('WIND_DIRECTION_SOURCE'):
             self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind.fileName)
 
         # Check time difference between SAR image and wind direction object
         timediff = self.SAR_image_time.replace(tzinfo=None) - \
-                parse(aux_wind.get_metadata(bandID=1, key='time_iso_8601'))
+                parse(aux_wind.get_metadata(band_id=1, key='time_iso_8601'))
 
         try:
             hoursDiff = np.abs(timediff.total_seconds()/3600.)
@@ -291,7 +291,7 @@ class SARWind(Nansat, object):
         print 'Time difference between SAR image and wind direction: ' \
                 + '%.2f' % hoursDiff + ' hours'
         print 'SAR image time: ' + str(self.SAR_image_time)
-        print 'Wind dir time: ' + str(parse(aux_wind.get_metadata(bandID=1,
+        print 'Wind dir time: ' + str(parse(aux_wind.get_metadata(band_id=1,
             key='time_iso_8601')))
         if hoursDiff > 3:
             warnings.warn('Time difference exceeds 3 hours!')

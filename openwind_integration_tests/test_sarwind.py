@@ -99,9 +99,9 @@ class SARWindTest(unittest.TestCase):
             raise IOError('No ASAR data - try adding some as ' \
                     'described in templates/openwind_local_archive.py' )
         asar = Nansat(self.test_data.asar['agulhas'])
-        asar.resize(pixelsize=500, eResampleAlg=1)
+        asar.resize(pixelsize=500, resample_alg=1)
         mw = Nansat(self.test_data.ncep4asar['agulhas'])
-        mw.reproject(asar, eResampleAlg=1)
+        mw.reproject(asar, resample_alg=1)
         if sys.version_info < (2, 7):
             type(mw[1]) == np.ndarray
         else:
