@@ -133,12 +133,19 @@ class BayesianWind(SARWind):
                 fdg[fdg>100] = np.nan
                 fdg[fdg<-100] = np.nan
                 mask = np.isnan(fdg)
-                fdg[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask),
-                    fdg[~mask])
-                err_fdg = grid_based_uncertainty(fdg,2)
-                err_fdg[err_fdg<self.DOPPLER_ERR]=self.DOPPLER_ERR
+                try:
+                    fdg[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask),
+                        fdg[~mask])
+                except ValueError:
+                    # Not enough data to interpolate
+                    err_fdg = fdg.copy()
+                    err_fdg[:] = np.nan
+                else:
+                    err_fdg = grid_based_uncertainty(fdg,2)
+                    err_fdg[err_fdg<self.DOPPLER_ERR]=self.DOPPLER_ERR
+
                 nn.add_band(array=err_fdg, parameters={'name':'err_fdg'})
-                nn.reproject(self, eResampleAlg=self.RESAMPLE_ALG, tps=True)
+                nn.reproject(self, resample_alg=self.RESAMPLE_ALG, tps=True)
                 try:
                     fdg = nn['fdg']
                     val = nn['valid_doppler']
@@ -202,7 +209,7 @@ class BayesianWind(SARWind):
         model_wind.add_band(array=err_v, parameters={'name':'err_v'})
 
         # Reproject to SAR image
-        model_wind.reproject(self, eResampleAlg=self.RESAMPLE_ALG, tps=True)
+        model_wind.reproject(self, resample_alg=self.RESAMPLE_ALG, tps=True)
 
         # Get uncertainties in model wind  
         err_u = model_wind['err_u']
@@ -289,7 +296,7 @@ class BayesianWind(SARWind):
                     ub_all[i,j] = u_apriori[ind_min]
                     vb_all[i,j] = v_apriori[ind_min]
                 else:
-                    # Set result to that of model and cmod result
+                    ## Set result to that of model and cmod result
                     ub_all[i,j] = np.nan #ub_modcmod[i,j]
                     vb_all[i,j] = np.nan #vb_modcmod[i,j]
 
