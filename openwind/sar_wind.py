@@ -21,7 +21,6 @@ try:
 except:
     print 'WARNING: Matplotlib not available, cannot make plots'
 
-from nansat.tools import OptionError
 from nansat.nansat import Nansat, Domain, _import_mappers
 try:
     from nansat.nansatmap import Nansatmap
@@ -207,7 +206,7 @@ class SARWind(Nansat, object):
                 wind_u_bandNo = aux._get_band_number({
                             'standard_name': 'eastward_wind',
                         })
-            except OptionError:
+            except ValueError:
                 wind_u_bandNo = aux._get_band_number({
                             'standard_name': 'x_wind',
                         })
@@ -239,7 +238,7 @@ class SARWind(Nansat, object):
             eastward_wind_bandNo = aux_wind._get_band_number({
                         'standard_name': 'eastward_wind',
                     })
-        except OptionError:
+        except ValueError:
             x_wind_bandNo = aux_wind._get_band_number({
                         'standard_name': 'x_wind',
                     })
