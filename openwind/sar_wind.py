@@ -585,13 +585,13 @@ class SARWind(Nansat, object):
         bands = kwargs.pop('bands', None)
         if not bands:
             bands = [
-                    self._get_band_number('U'),
-                    self._get_band_number('V'),
-                    self._get_band_number('winddirection'),
-                    self._get_band_number('windspeed'),
+                    self.get_band_number('U'),
+                    self.get_band_number('V'),
+                    self.get_band_number('winddirection'),
+                    self.get_band_number('windspeed'),
                 ]
             if self.has_band('model_windspeed'):
-                bands.append(self._get_band_number('model_windspeed'))
+                bands.append(self.get_band_number('model_windspeed'))
         # TODO: add name of original file to metadata
         super(SARWind, self).export(bands=bands, *args, **kwargs)
 
