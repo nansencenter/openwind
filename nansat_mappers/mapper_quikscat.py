@@ -13,9 +13,9 @@ from nansat.mappers.mapper_netcdf_cf import Mapper as NetcdfCF
 from nansat.exceptions import WrongMapperError
 
 class Mapper(NetcdfCF):
+    """ Nansat mapper for QuikScat """
 
-    def __init__(self, filename, gdal_dataset, metadata, *args, **kwargs):
-        quartile = kwargs.pop('quartile', 0)
+    def __init__(self, filename, gdal_dataset, metadata, quartile=0, *args, **kwargs):
 
         if not metadata.has_key('NC_GLOBAL#source') \
                 or not metadata['NC_GLOBAL#source'].lower() == 'quikscat':
