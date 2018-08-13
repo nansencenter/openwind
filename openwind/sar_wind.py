@@ -78,7 +78,7 @@ class SARWind(Nansat, object):
 
         # Check that this is a SAR image with real-valued VV pol NRCS
         try:
-            self.sigma0_bandNo = self._get_band_number({
+            self.sigma0_bandNo = self.get_band_number({
                 'standard_name':
                     'surface_backwards_scattering_coefficient_of_radar_wave',
                 'polarization': 'VV',
@@ -89,7 +89,7 @@ class SARWind(Nansat, object):
                 ' does not have SAR NRCS in VV polarization')
 
         if band_name:
-            self.sigma0_bandNo = self._get_band_number({'name': band_name})
+            self.sigma0_bandNo = self.get_band_number({'name': band_name})
 
         self.SAR_image_time = self.time_coverage_start
            # get_time(
@@ -203,11 +203,11 @@ class SARWind(Nansat, object):
                 ])
             # Set filename of source wind in metadata
             try:
-                wind_u_bandNo = aux._get_band_number({
+                wind_u_bandNo = aux.get_band_number({
                             'standard_name': 'eastward_wind',
                         })
             except ValueError:
-                wind_u_bandNo = aux._get_band_number({
+                wind_u_bandNo = aux.get_band_number({
                             'standard_name': 'x_wind',
                         })
             self.set_metadata('WIND_DIRECTION_SOURCE',
@@ -235,14 +235,14 @@ class SARWind(Nansat, object):
             raise ValueError('Input parameter must be of type Nansat')
 
         try:
-            eastward_wind_bandNo = aux_wind._get_band_number({
+            eastward_wind_bandNo = aux_wind.get_band_number({
                         'standard_name': 'eastward_wind',
                     })
         except ValueError:
-            x_wind_bandNo = aux_wind._get_band_number({
+            x_wind_bandNo = aux_wind.get_band_number({
                         'standard_name': 'x_wind',
                     })
-            y_wind_bandNo = aux_wind._get_band_number({
+            y_wind_bandNo = aux_wind.get_band_number({
                         'standard_name': 'y_wind',
                     })
             # Get azimuth of aux_wind y-axis in radians
@@ -299,10 +299,10 @@ class SARWind(Nansat, object):
                         'estimate reliable wind field' %hoursDiff)
 
         # Get band numbers of eastward and northward wind
-        eastward_wind_bandNo = aux_wind._get_band_number({
+        eastward_wind_bandNo = aux_wind.get_band_number({
                     'standard_name': 'eastward_wind',
                 })
-        northward_wind_bandNo = aux_wind._get_band_number({
+        northward_wind_bandNo = aux_wind.get_band_number({
                     'standard_name': 'northward_wind',
                 })
 
@@ -327,7 +327,7 @@ class SARWind(Nansat, object):
         print 'Calculating SAR wind with CMOD...'
         startTime = datetime.now()
         try:
-            look_dir = self[self._get_band_number({'standard_name':
+            look_dir = self[self.get_band_number({'standard_name':
                 'sensor_azimuth_angle'})]
         except:
             raise Exception('Look direction is not available for SAR image.')
@@ -394,7 +394,7 @@ class SARWind(Nansat, object):
                     ice = Nansat('metno_hires_seaice:' +
                             self.SAR_image_time.strftime('%Y%m%d'))
                 ice.reproject(self, tps=True)
-                iceBandNo = ice._get_band_number(
+                iceBandNo = ice.get_band_number(
                     {'standard_name': 'sea_ice_area_fraction'})
                 sar_windspeed[ice[iceBandNo]>0] = -1
                 palette.set_under('w', 1.0) # Ice is 'under' (-1)
