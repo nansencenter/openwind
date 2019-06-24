@@ -1,0 +1,6 @@
+---
+geospaas_dirs:
+  - {name: STATIC_ROOT,     path: '{{ geospaas_project_home }}/{{ geospaas_project_name }}/static_root'}
+  - {name: MEDIA_ROOT,      path: '{{ geospaas_project_home }}/{{ geospaas_project_name }}/media'}
+  - {name: DOWNLOADS_ROOT,  path: '{{ geospaas_project_home }}/{{ geospaas_project_name }}/downloads'}
+  - {name: PRODUCTS_ROOT,   path: '{{ geospaas_project_home }}/{{ geospaas_project_name }}/products'}

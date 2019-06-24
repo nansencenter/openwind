@@ -1,0 +1,62 @@
+---
+- name: Local VM | Mount network folders
+  become: yes
+  mount:
+    name: "{{ item.mount_name }}/{{ item.folder }}"
+    src: "{{ item.mount_src }}/{{ item.folder }}"
+    fstype: cifs
+    opts: "uid={{ uid }},gid={{ gid }},username={{ username }},password={{ password }},domain={{ domain }}"
+    state: mounted
+  with_items:
+    - "{{ mount_folders }}"
+  ignore_errors: yes
+
+- name: Local VM | Make lib folder in package root
+  file:
+    path: /vagrant/lib
+    state: directory
+    mode: 0755
+
+- name: Local VM | Ensure .ipython folder exists
+  file:
+      path: /home/vagrant/.ipython
+      state: directory
+
+- name: Local VM | Ensure .ipython/profile_default folder exists
+  file:
+      path: /home/vagrant/.ipython/profile_default 
+      state: directory
+
+- name: Local VM | Check if shared ipython history file exists in default location
+  stat: path=/vagrant/lib/ipython_history.sqlite
+  register: ipython_history
+
+- name: Local VM | Create ipython history file if it does not exist
+  file:
+      path: /vagrant/lib/ipython_history.sqlite
+      state: touch
+      mode: 0755
+  when: not ipython_history.stat.exists
+
+- name: Local VM | Create link to ipython history file
+  file:
+      src: /vagrant/lib/ipython_history.sqlite
+      dest: /home/vagrant/.ipython/profile_default/history.sqlite
+      state: link
+
+- name: Local VM | Check if shared bash history file exists in default location
+  stat: path=/vagrant/lib/dot_bash_history
+  register: bash_history
+
+- name: Local VM | Create shared bash history file if it does not exist
+  file:
+      path: /vagrant/lib/dot_bash_history
+      state: touch
+      mode: 0755
+  when: not bash_history.stat.exists
+
+- name: Local VM | Create link to shared bash history file
+  file:
+      src: /vagrant/lib/dot_bash_history
+      dest: /home/vagrant/.bash_history
+      state: link

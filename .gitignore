@@ -2,4 +2,14 @@
 *.pyc
 *.swp
 *.png
+*.so
+*.o
 test_data/
+.vagrant/*
+project/*
+docs/_build/
+lib/*
+provisioning/site.retry
+provisioning/roles/andrew*
+provisioning/roles/nansencenter.django/*
+provisioning/roles/localvm/defaults/*

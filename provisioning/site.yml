@@ -1,0 +1,38 @@
+---
+- hosts: openwind
+  vars:
+      project_home:   '/vagrant/lib'
+      project_name:   'project'
+      env_name: 'py3openwind'
+      conda_dir: '/home/vagrant/anaconda'
+      conda_env_update_if_present: True
+
+  roles:
+      - role: nansencenter.django
+        django_project_home: '{{ project_home }}'
+        django_project_name: '{{ project_name }}'
+        django_conda_dir: '{{ conda_dir }}'
+        django_env_name: '{{ env_name }}'
+        django_apps:
+          - geospaas.vocabularies
+          - geospaas.catalog
+          - geospaas.nansat_ingestor
+          - geospaas.viewer
+          - django_forms_bootstrap
+          - leaflet
+        django_urlpatterns:
+          - "path('', include('geospaas.urls')),"
+
+      - role: geospaas
+        geospaas_project_home: '{{ project_home }}'
+        geospaas_project_name: '{{ project_name }}'
+        geospaas_env_name: '{{ env_name }}'
+        geospaas_conda_dir: '{{ conda_dir }}'
+
+      - role: openwind
+      
+      - role: localvm
+
+  environment:
+    PYTHONPATH: "/vagrant"
+    PATH: "{{ conda_dir }}/envs/{{ env_name }}/bin:{{ ansible_env.PATH }}"

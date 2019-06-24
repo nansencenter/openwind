@@ -1,0 +1,19 @@
+---
+channels:
+  - conda-forge
+dependencies:
+  - python=3.6
+  - django
+  - binutils
+  - pyproj
+  #- libproj-dev
+  #- gdal-bin
+  - gdal
+  - libspatialite
+  #- pythesint
+  - nansat
+  - nose
+  - coveralls
+  - mock
+  - ipython
+  - ipdb

@@ -1,0 +1,3 @@
+---
+geospaas_settings: "{{ geospaas_project_home }}/{{ geospaas_project_name }}/{{ geospaas_project_name }}/settings.py"
+geospaas_urls: "{{ geospaas_project_home }}/{{ geospaas_project_name }}/{{ geospaas_project_name }}/urls.py"

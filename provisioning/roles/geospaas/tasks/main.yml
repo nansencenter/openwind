@@ -1,0 +1,25 @@
+---
+- name: geospaas | Create link to django project folder in the home folder
+  file: path=/home/vagrant/{{ project_name }}
+        src={{ project_home }}/{{ project_name }}
+        state=link
+        force=yes
+
+        #- name: geospaas | Link geospaas from site-packages
+        #  file: path='{{ python_dist_packages }}/openwind'
+        #        src='{{ dev_sources_dir }}/openwind/openwind'
+        #        state=link
+        #        force=yes
+        #
+        #    # NOTE - may need to link geospaas from site-packages instead
+        #- name: geospaas | Run migrate on django-geo-spaas project
+        #  shell: "source {{ conda_dir }}/bin/activate {{ env_name }} && ./manage.py migrate"
+        #  args:
+        #    executable: /bin/bash
+        #    chdir: /home/vagrant/project
+        #
+        #- name: geospaas | Update vocabularies
+        #  shell: "source {{ conda_dir }}/bin/activate {{ env_name }} && ./manage.py update_vocabularies"
+        #  args:
+        #    executable: /bin/bash
+        #    chdir: /home/vagrant/project

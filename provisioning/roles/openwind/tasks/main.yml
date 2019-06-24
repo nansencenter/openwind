@@ -1,0 +1,5 @@
+# Adding the shared folder to the pythonpath allows development work for the current repository
+# given that the actual python app is located on the root, e.g., openwind/openwind
+- name: openwind | Add PYTHONPATH to bashrc
+  lineinfile: dest="/home/vagrant/.bashrc" line="export PYTHONPATH=/vagrant"
+
