@@ -10,7 +10,7 @@ dependencies:
   #- gdal-bin
   - gdal
   - libspatialite
-  #- pythesint
+  - pythesint
   - nansat
   - nose
   - coveralls
