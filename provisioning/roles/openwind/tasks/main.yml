@@ -95,7 +95,7 @@
     register: jupyter_status
   
   - name: openwind | Launch Jupyter Notebook
-    command: /home/vagrant/run_jupyter.sh
+    shell: "nohup /home/vagrant/run_jupyter.sh > /dev/null 2>&1 &"
     when: jupyter_status.rc != 0
 
   #  shell: "source activate {{ env_name }}; nohup {{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/notebooks/ --NotebookApp.token=vagrant > /dev/null 2>&1 &"
