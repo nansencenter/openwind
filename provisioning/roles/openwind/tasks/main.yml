@@ -7,7 +7,7 @@
   shell: 'sudo chown -R vagrant /home/vagrant/anaconda/'
 
 - name: openwind | Add Jupyter Notebook to crontab
-  cron: name="Jupyter Notebook" special_time=reboot job="sleep 60; {{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir={{ dev_sources_dir }}/notebooks/ --NotebookApp.token=vagrant"
+  cron: name="Jupyter Notebook" special_time=reboot job="sleep 60; {{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/notebooks/ --NotebookApp.token=vagrant"
 
 - name: openwind | Check if Jupyter is running
   shell: ps aux | grep jupyter | grep -v grep
@@ -16,7 +16,7 @@
   register: jupyter_status
 
 - name: openwind | Launch Jupyter Notebook
-  shell: "nohup {{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir={{ dev_sources_dir }}/notebooks/ --NotebookApp.token=vagrant > /dev/null 2>&1 &"
+  shell: "nohup {{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/notebooks/ --NotebookApp.token=vagrant > /dev/null 2>&1 &"
   when: jupyter_status.rc != 0
 
   #- name: Nansat Setup Python | Check if numpy is imported
