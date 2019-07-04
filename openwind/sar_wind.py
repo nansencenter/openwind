@@ -22,10 +22,7 @@ except:
     print('WARNING: Matplotlib not available, cannot make plots')
 
 from nansat.nansat import Nansat, Domain, _import_mappers
-try:
-    from nansat.nansatmap import Nansatmap
-except ImportError:
-    warnings.warn('Nansatmap is removed from nansat, method save_wind_map_image will not work')
+from nansatmap.nansatmap import Nansatmap
 from openwind.cmod5n import cmod5n_inverse
 
 class TimeDiffError(Exception):
@@ -70,12 +67,13 @@ class SARWind(Nansat, object):
                         Force wind calculation if True
 
         """
-        if isinstance(sar_image, str) or isinstance(sar_image, unicode):
+        if isinstance(sar_image, str):
             super(SARWind, self).__init__(sar_image, *args, **kwargs)
         elif isinstance(sar_image, Nansat):
-            super(SARWind, self).__init__(domain=sar_image, *args, **kwargs)
+            super(SARWind, self).from_domain(sar_image, *args, **kwargs)
             self.vrt = sar_image.vrt
             self.mapper = sar_image.mapper
+            self.logger = sar_image.logger
 
         # Check that this is a SAR image with real-valued VV pol NRCS
         if band_name:
@@ -94,9 +92,6 @@ class SARWind(Nansat, object):
         if pixelsize != 'fullres':
             print('Resizing SAR image to ' + str(pixelsize) + ' m pixel size')
             self.resize(pixelsize=pixelsize)
-
-        import ipdb
-        ipdb.set_trace()
 
         if not self.has_band('winddirection'):
             self.set_aux_wind(wind_direction, resample_alg=resample_alg,
@@ -187,9 +182,9 @@ class SARWind(Nansat, object):
                     datetime.strftime(self.SAR_image_time, ':%Y%m%d%H%M')
         aux = Nansat(aux_wind_source, netcdf_dim={
                 'time': np.datetime64(self.SAR_image_time),
-                'height2': '10', # height dimension used in AROME arctic
+                'height2': 10, # height dimension used in AROME arctic
                                     # datasets
-                'height3': '10',
+                'height3': 10,
             },
             bands = [ # CF standard names of desired bands
                 'x_wind_10m',

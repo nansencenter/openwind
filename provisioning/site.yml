@@ -32,10 +32,9 @@
       - role: openwind
         dev_sources_dir: '{{ project_home }}'
         nansat_version: 'issue391_s2_opendap_mapper'
-        python_dist_packages: '/home/vagrant/Miniconda3-4.6.14-Linux-x86_64/envs/py3openwind/lib/python3.6/site-packages'
+        python_dist_packages: "{{ conda_dir }}/envs/{{ env_name }}/lib/python3.6/site-packages"
       
       - role: localvm
 
   environment:
-    PYTHONPATH: "/vagrant"
-    PATH: "{{ conda_dir }}/envs/{{ env_name }}/bin:{{ ansible_env.PATH }}"
+      PATH: "{{ conda_dir }}/envs/{{ env_name }}/bin:{{ ansible_env.PATH }}"
