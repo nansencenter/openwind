@@ -10,11 +10,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   #config.vm.box_url = "https://app.vagrantup.com/bento/boxes/ubuntu-18.10"
 
   config.vm.define "openwind", primary: true do |openwind|
+    openwind.vm.network :private_network, ip: "192.168.33.10"
+    openwind.vm.network "forwarded_port", guest: 8888, host: 8888
   end
 
+
   config.vm.provider "virtualbox" do |v|
-    v.memory = 4000
-    v.cpus = 1
+    v.memory = 5000
+    v.cpus = 2
   end
 
   # If true, then any SSH connections made will enable agent forwarding.
