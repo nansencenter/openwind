@@ -10,6 +10,8 @@ test_data/
 project/*
 docs/_build/
 lib/*
+notebooks/lib/*
+notebooks/.ipynb_checkpoints
 provisioning/site.retry
 provisioning/roles/andrew*
 provisioning/roles/nansencenter.django/*
