@@ -16,3 +16,5 @@ dependencies:
   - mock
   - ipython
   - ipdb
+  - thredds_crawler
+  - jupyter
