@@ -583,8 +583,7 @@ class SARWind(Nansat, object):
 
         nMap.save(filename, landmask=landmask, **kwargs)
 
-    def export(self, *args, **kwargs):
-        bands = kwargs.pop('bands', None)
+    def get_bands_to_export(self, bands):
         if not bands:
             bands = [
                     self.get_band_number('U'),
@@ -594,9 +593,17 @@ class SARWind(Nansat, object):
                 ]
             if self.has_band('model_windspeed'):
                 bands.append(self.get_band_number('model_windspeed'))
-        # TODO: add name of original file to metadata
-        super(SARWind, self).export(bands=bands, *args, **kwargs)
+        return bands
 
+    def export(self, *args, **kwargs):
+        bands = kwargs.pop('bands', None)
+        # TODO: add name of original file to metadata
+        super(SARWind, self).export(bands=self.get_bands_to_export(bands), *args, **kwargs)
+
+    def export2thredds(self, *args, **kwargs):
+        bands = kwargs.pop('bands', None)
+        # TODO: add name of original file to metadata
+        super(SARWind, self).export2thredds(bands=self.get_bands_to_export(bands), *args, **kwargs)
 
 ###################################
 #    If run from command line

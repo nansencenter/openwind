@@ -34,6 +34,7 @@ from geospaas.utils.utils import nansat_filename
 from geospaas.nansat_ingestor.models import Dataset as NansatDataset
 from geospaas.catalog.models import Dataset
 
+from geospaas_wind.exceptions import TooHighResolutionError, PolarizationError
 
 # Place to store downloads - TODO: generalise to follow env settings
 downloads = os.path.join(os.path.expanduser('~'), 'downloads')
@@ -69,16 +70,20 @@ def wind_from_downloaded_sar_and_arome_netcdfs(sar, arome):
 def wind_from_sar_and_arome_forecast(sar_uri):
     """ Calculate wind field from provided SAR and forecast wind files
     """
-    result_fn = os.path.join(downloads, 'wind_from_'+os.path.basename(sar_uri))
+    if 'GRDH' in os.path.basename(sar_uri):
+        raise TooHighResolutionError(file=sar_uri, msg='Too high resolution')
+    if 'SDH' in os.path.basename(sar_uri):
+        raise PolarizationError(file=sar_uri, msg='Only VV polarization allowed') # VV to HH conversion not tested enough
     sar_ds = NansatDataset.objects.get(dataseturi__uri=sar_uri)
     # Find collocated Arome forecast
-    arome_ds = Dataset.objects.filter(
+    arome_ds = Dataset.objects.get( # AROME is produced every 3 hours, so get should be ok
             summary__contains='AROME', 
             time_coverage_start__range=[
-                sar_ds.time_coverage_start - timedelta(hours=3), 
-                sar_ds.time_coverage_end + timedelta(hours=3)],
+                sar_ds.time_coverage_start - timedelta(hours=1.5), 
+                sar_ds.time_coverage_end + timedelta(hours=1.5)],
             geographic_location__geometry__intersects=sar_ds.geographic_location.geometry
-        ).order_by('time_coverage_start')[0]
+        ) #.order_by('time_coverage_start')
+    #arome_ds = arome_ds[0]
 
     try:
         # Calculate wind
@@ -87,8 +92,7 @@ def wind_from_sar_and_arome_forecast(sar_uri):
         """ Likely a problem with the server - fall back to downloading the data """
         w = wind_from_downloaded_sar_and_arome_netcdfs(sar_ds, arome_ds)
 
-    # Export where the data is used... Not always useful to store netCDFs
-    #w.export(result_fn)
+    # Return SARWind object and export where the data is used...
     return w
 
 def crawl_arome_arctic_archive(date, base_url='https://thredds.met.no/thredds/catalog/aromearcticarchive/'):
