@@ -87,7 +87,8 @@ def wind_from_sar_and_arome_forecast(sar_uri):
         """ Likely a problem with the server - fall back to downloading the data """
         w = wind_from_downloaded_sar_and_arome_netcdfs(sar_ds, arome_ds)
 
-    w.export(result_fn)
+    # Export where the data is used... Not always useful to store netCDFs
+    #w.export(result_fn)
     return w
 
 def crawl_arome_arctic_archive(date, base_url='https://thredds.met.no/thredds/catalog/aromearcticarchive/'):
