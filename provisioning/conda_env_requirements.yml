@@ -17,4 +17,6 @@ dependencies:
   - ipython
   - ipdb
   - thredds_crawler
+  - cartopy
+  - basemap-data-hires
   - jupyter
