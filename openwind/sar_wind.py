@@ -601,9 +601,9 @@ class SARWind(Nansat, object):
         super(SARWind, self).export(bands=self.get_bands_to_export(bands), *args, **kwargs)
 
     def export2thredds(self, *args, **kwargs):
-        bands = kwargs.pop('bands', None)
+        #bands = kwargs.pop('bands', None)
         # TODO: add name of original file to metadata
-        super(SARWind, self).export2thredds(bands=self.get_bands_to_export(bands), *args, **kwargs)
+        super(SARWind, self).export2thredds(*args, **kwargs)
 
 ###################################
 #    If run from command line
