@@ -1,14 +1,17 @@
 import os, warnings
+import json
 import numpy as np
 import tempfile
 
 import pythesint as pti
 
+from nansat.nansat import Nansat
 from nansat.domain import Domain
 from nansat.tools import haversine
 
-from django.conf import settings
 from django.db import models
+from django.conf import settings
+from django.utils import timezone
 
 from geospaas.catalog.models import DatasetURI, Dataset
 
@@ -34,7 +37,8 @@ class WindManager(models.Manager):
 
         metadata = w.get_metadata()
 
-        # Export wind to temporary file
+        # Direct reprojection fails - gdal can't read the bands if we do w.reproject...
+        # Workaround: Export wind to temporary file
         fd, tmp_filename = tempfile.mkstemp(suffix='.nc')
         os.close(fd) # Just in case - see https://www.logilab.org/blogentry/17873
         w.export(tmp_filename)
