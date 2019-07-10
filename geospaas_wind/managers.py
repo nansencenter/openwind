@@ -14,11 +14,12 @@ from django.conf import settings
 from django.utils import timezone
 
 from geospaas.catalog.models import DatasetURI, Dataset
+from geospaas.nansat_ingestor.managers import DatasetManager
 
 from geospaas_wind.utils import wind_from_sar_and_arome_forecast
 from geospaas_wind.exceptions import TooHighResolutionError, PolarizationError
 
-class WindManager(models.Manager):
+class WindManager(DatasetManager):
 
     def process(self, uri, force=False, *args, **kwargs):
         fn = 'WIND_'+os.path.basename(uri)
