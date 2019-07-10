@@ -34,12 +34,11 @@ class WindManager(DatasetManager):
         try:
             w = wind_from_sar_and_arome_forecast(uri)
         except (TooHighResolutionError, PolarizationError, ObjectDoesNotExist) as e:
-            try:
+            if type(e)==Dataset.DoesNotExist:
+                warnings.warn(uri+': '+e.args[0])
+            else:
+                # ObjectDoesNotExist could happen if there is no overlap between SAR and model
                 warnings.warn(e.file + ': ' + e.msg)
-            except AttributeError:
-                import ipdb
-                ipdb.set_trace()
-                warnings.warn(e)
             return None, False
 
         metadata = w.get_metadata()
