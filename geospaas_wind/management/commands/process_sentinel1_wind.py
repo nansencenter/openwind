@@ -46,6 +46,7 @@ class Command(BaseCommand):
         failed = 0
         reprocessed = 0
         ingested = 0
+        already_processed = 0
         numds = len(s1ds)
         print('Processing %d datasets' %numds)
         for i,ds in enumerate(s1ds):
@@ -59,12 +60,17 @@ class Command(BaseCommand):
                 self.stdout.write('Successfully processed (%d/%d): %s\n' % (i+1, numds, dsuri.uri))
                 ingested += 1
             elif not cr and wds:
-                self.stdout.write('Successfully reprocessed (%d/%d): %s\n' % (i+1, numds, dsuri.uri))
-                reprocessed += 1
+                if options['force_reprocessing']:
+                    self.stdout.write('Successfully reprocessed (%d/%d): %s\n' % (i+1, numds, dsuri.uri))
+                    reprocessed += 1
+                else:
+                    self.stdout.write('Already processed (%d/%d): %s\n' % (i+1, numds, dsuri.uri))
+                    already_processed +=1
             elif not cr and not wds:
                 failed += 1
 
         self.stdout.write('Successfully processed %d/%d datasets.\n' % (ingested, numds))
+        self.stdout.write('%d/%d datasets were already processed.\n' % (already_processed, numds))
         if  options['force_reprocessing']:
             self.stdout.write('Successfully reprocessed %d/%d datasets.\n' % (reprocessed, numds))
         self.stdout.write('Failed at processing %d/%d datasets.\n' % (failed, numds))
