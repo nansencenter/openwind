@@ -588,8 +588,8 @@ class SARWind(Nansat, object):
             bands = [
                     self.get_band_number('U'),
                     self.get_band_number('V'),
-                    self.get_band_number('winddirection'),
-                    self.get_band_number('windspeed'),
+                    #self.get_band_number('winddirection'),
+                    #self.get_band_number('windspeed'),
                 ]
             if self.has_band('model_windspeed'):
                 bands.append(self.get_band_number('model_windspeed'))
