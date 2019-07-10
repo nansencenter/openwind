@@ -19,4 +19,5 @@ dependencies:
   - thredds_crawler
   - cartopy
   - basemap-data-hires
+  - folium
   - jupyter
