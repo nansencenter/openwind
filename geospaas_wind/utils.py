@@ -78,6 +78,7 @@ def wind_from_sar_and_arome_forecast(sar_uri):
     # Find collocated Arome forecast
     arome_ds = Dataset.objects.get( # AROME is produced every 3 hours, so get should be ok
             summary__contains='AROME', 
+            source__instrument__short_name='Computer',
             time_coverage_start__range=[
                 sar_ds.time_coverage_start - timedelta(hours=1.5), 
                 sar_ds.time_coverage_end + timedelta(hours=1.5)],
