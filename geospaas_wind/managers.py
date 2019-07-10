@@ -12,6 +12,7 @@ from nansat.tools import haversine
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
 
 from geospaas.catalog.models import DatasetURI, Dataset
 from geospaas.nansat_ingestor.managers import DatasetManager
@@ -32,7 +33,7 @@ class WindManager(DatasetManager):
 
         try:
             w = wind_from_sar_and_arome_forecast(uri)
-        except (TooHighResolutionError, PolarizationError) as e:
+        except (TooHighResolutionError, PolarizationError, ObjectDoesNotExist) as e:
             warnings.warn(e.file + ': ' + e.msg)
             return None, False
 
