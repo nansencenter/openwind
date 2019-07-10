@@ -1,11 +1,14 @@
 import os, warnings
 import numpy as np
+import tempfile
 
-from django.conf import settings
-from django.db import models
+import pythesint as pti
 
 from nansat.domain import Domain
 from nansat.tools import haversine
+
+from django.conf import settings
+from django.db import models
 
 from geospaas.catalog.models import DatasetURI, Dataset
 
@@ -28,8 +31,19 @@ class WindManager(models.Manager):
         except (TooHighResolutionError, PolarizationError) as e:
             warnings.warn(e.file + ': ' + e.msg)
             return None, False
+
+        metadata = w.get_metadata()
+
+        # Export wind to temporary file
+        fd, tmp_filename = tempfile.mkstemp(suffix='.nc')
+        os.close(fd) # Just in case - see https://www.logilab.org/blogentry/17873
+        w.export(tmp_filename)
+
+        # Read temporary file
+        ww = Nansat(tmp_filename)
+
         # Reproject
-        lon, lat = w.get_geolocation_grids()
+        lon, lat = ww.get_geolocation_grids()
         srs = '+proj=stere +datum=WGS84 +ellps=WGS84 +lat_0=%.2f +lon_0=%.2f +no_defs'%(np.mean(lat),np.mean(lon))
         xmin, xmax, ymin, ymax = -haversine(np.mean(lon),np.mean(lat),np.min(lon),np.mean(lat)), \
                     haversine(np.mean(lon),np.mean(lat),np.max(lon),np.mean(lat)), \
@@ -37,15 +51,31 @@ class WindManager(models.Manager):
                     haversine(np.mean(lon),np.mean(lat),np.mean(lon),np.max(lat))
         ext = '-te %.2f %2.f %.2f %.2f -tr 500 500' %(xmin,ymin,xmax,ymax)
         d = Domain(srs, ext)
-        ## Copy to new object with only a few bands? -- This is done in export2thredds..
-        #    super(SARWind, self).from_domain(sar_image, *args, **kwargs)
-        #    self.vrt = sar_image.vrt
-        #    self.mapper = sar_image.mapper
-        #    self.logger = sar_image.logger
-        w.reproject(d)
+        ww.reproject(d, tps=True)
+
+        # Set global metadata
+        metadata['data_center'] = json.dumps(pti.get_gcmd_provider('nersc'))
+        metadata['entry_title'] = 'Wind field from '+metadata['entry_title']
+        metadata.pop('file_creation_date')
+        metadata['history'] = metadata['history'] + timezone.now().isoformat() + \
+                '. Calculated wind field from NRCS and Arome Arctic forecast wind directions.'
+        metadata.pop('institution')
+        metadata['keywords'] += ', ['
+        for key, value in pti.get_gcmd_science_keyword('U/V WIND COMPONENTS').items():
+            if value:
+                metadata['keywords'] += value + ', '
+        metadata['keywords'] += ']'
+        metadata.pop('LINE_SPACING')
+        metadata.pop('PIXEL_SPACING')
+        metadata['summary'] = 'Near surface (10m) wind from Arome Arctic forecast wind and ' + metadata['summary']
+        metadata['title'] = 'Near surface wind from '+metadata['title']
+
         # Export
-        w.export2thredds(thredds_fn, bands={'U':{},'V':{}})
+        #ww.export2thredds(thredds_fn, mask_name='swathmask', bands={'U':{},'V':{}}, metadata=metadata)
+        ww.export2thredds(thredds_fn, mask_name='swathmask', metadata=metadata)
         wds, cr = super(WindManager, self).get_or_create(wind_uri)
         
+        os.unlink(tmp_filename)
+
         return wds, cr
 
