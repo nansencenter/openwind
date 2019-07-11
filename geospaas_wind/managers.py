@@ -45,8 +45,9 @@ class WindManager(DatasetManager):
 
         # Direct reprojection fails - gdal can't read the bands if we do w.reproject...
         # Workaround: Export wind to temporary file
-        fd, tmp_filename = tempfile.mkstemp(suffix='.nc')
-        os.close(fd) # Just in case - see https://www.logilab.org/blogentry/17873
+        tmp_filename = os.path.join(settings.PRODUCTS_ROOT,'TMP_WIND_'+os.path.basename(uri))
+        #fd, tmp_filename = tempfile.mkstemp(suffix='.nc')
+        #os.close(fd) # Just in case - see https://www.logilab.org/blogentry/17873
         w.export(tmp_filename)
 
         # Read temporary file
@@ -85,7 +86,7 @@ class WindManager(DatasetManager):
         ww.export2thredds(thredds_fn, mask_name='swathmask', metadata=metadata)
         wds, cr = super(WindManager, self).get_or_create(wind_uri)
         
-        os.unlink(tmp_filename)
+        #os.unlink(tmp_filename)
 
         return wds, cr
 
