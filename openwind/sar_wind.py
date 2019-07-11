@@ -208,8 +208,7 @@ class SARWind(Nansat, object):
                 wind_u_bandNo = aux.get_band_number({
                         'standard_name': 'x_wind_10m',
                     })
-        self.set_metadata('WIND_DIRECTION_SOURCE',
-                aux.get_metadata(band_id=wind_u_bandNo)['SourceFilename'])
+        self.set_metadata('WIND_DIRECTION_SOURCE', aux_wind_source)
         wdir, wdir_time, wspeed = self._get_wind_direction_array(aux,
                                         *args, **kwargs)
 
