@@ -45,9 +45,9 @@ class WindManager(DatasetManager):
 
         # Direct reprojection fails - gdal can't read the bands if we do w.reproject...
         # Workaround: Export wind to temporary file
-        tmp_filename = os.path.join(settings.PRODUCTS_ROOT,'TMP_WIND_'+os.path.basename(uri))
-        #fd, tmp_filename = tempfile.mkstemp(suffix='.nc')
-        #os.close(fd) # Just in case - see https://www.logilab.org/blogentry/17873
+        #tmp_filename = os.path.join(settings.PRODUCTS_ROOT,'TMP_WIND_'+os.path.basename(uri))
+        fd, tmp_filename = tempfile.mkstemp(suffix='.nc')
+        os.close(fd) # Just in case - see https://www.logilab.org/blogentry/17873
         w.export(tmp_filename)
 
         # Read temporary file
@@ -55,14 +55,16 @@ class WindManager(DatasetManager):
 
         # Reproject
         lon, lat = ww.get_geolocation_grids()
+        #lon, lat = w.get_geolocation_grids()
         srs = '+proj=stere +datum=WGS84 +ellps=WGS84 +lat_0=%.2f +lon_0=%.2f +no_defs'%(np.mean(lat),np.mean(lon))
         xmin, xmax, ymin, ymax = -haversine(np.mean(lon),np.mean(lat),np.min(lon),np.mean(lat)), \
                     haversine(np.mean(lon),np.mean(lat),np.max(lon),np.mean(lat)), \
                     -haversine(np.mean(lon),np.mean(lat),np.mean(lon),np.min(lat)), \
                     haversine(np.mean(lon),np.mean(lat),np.mean(lon),np.max(lat))
-        ext = '-te %.2f %2.f %.2f %.2f -tr 500 500' %(xmin,ymin,xmax,ymax)
+        ext = '-te %d %d %d %d -tr 500 500' %(xmin-10000, ymin-10000, xmax+10000, ymax+10000)
         d = Domain(srs, ext)
         ww.reproject(d, tps=True)
+        #w.reproject(d, tps=True)
 
         # Set global metadata
         metadata['data_center'] = json.dumps(pti.get_gcmd_provider('nersc'))
@@ -82,11 +84,10 @@ class WindManager(DatasetManager):
         metadata['title'] = 'Near surface wind from '+metadata['title']
 
         # Export
-        #ww.export2thredds(thredds_fn, mask_name='swathmask', bands={'U':{},'V':{}}, metadata=metadata)
         ww.export2thredds(thredds_fn, mask_name='swathmask', metadata=metadata, no_mask_value=1)
         wds, cr = super(WindManager, self).get_or_create(wind_uri)
         
-        #os.unlink(tmp_filename)
+        os.unlink(tmp_filename)
 
         return wds, cr
 
