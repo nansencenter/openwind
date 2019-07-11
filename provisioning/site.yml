@@ -40,4 +40,4 @@
   environment:
       PATH: "{{ conda_dir }}/envs/{{ env_name }}/bin:{{ ansible_env.PATH }}"
       PYTHONPATH: "/vagrant:{{ project_home }}:{{ project_home }}/{{ project_name }}"
-
+      PROJ_LIB: "{{ conda_dir }}/envs/{{ env_name }}/share/proj"
