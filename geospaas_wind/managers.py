@@ -66,9 +66,9 @@ class WindManager(DatasetManager):
 
         # Set global metadata
         metadata['data_center'] = json.dumps(pti.get_gcmd_provider('nersc'))
-        metadata['entry_title'] = 'Wind field from '+metadata['entry_title']
+        metadata['entry_title'] = 'Wind field from '+os.path.basename(uri)
         metadata.pop('file_creation_date')
-        metadata['history'] = metadata['history'] + timezone.now().isoformat() + \
+        metadata['history'] = metadata['history'] + ' ' + timezone.now().isoformat() + \
                 '. Calculated wind field from NRCS and Arome Arctic forecast wind directions.'
         metadata.pop('institution')
         metadata['keywords'] += ', ['
@@ -83,7 +83,7 @@ class WindManager(DatasetManager):
 
         # Export
         #ww.export2thredds(thredds_fn, mask_name='swathmask', bands={'U':{},'V':{}}, metadata=metadata)
-        ww.export2thredds(thredds_fn, mask_name='swathmask', metadata=metadata)
+        ww.export2thredds(thredds_fn, mask_name='swathmask', metadata=metadata, no_mask_value=1)
         wds, cr = super(WindManager, self).get_or_create(wind_uri)
         
         #os.unlink(tmp_filename)
