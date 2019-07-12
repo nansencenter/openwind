@@ -4,6 +4,7 @@
         src={{ project_home }}/{{ project_name }}
         state=link
         force=yes
+  ignore_errors: yes
 
         #- name: geospaas | Link geospaas from site-packages
         #  file: path='{{ python_dist_packages }}/openwind'

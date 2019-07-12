@@ -5,6 +5,7 @@
 
   - name: openwind | Change owner of anaconda directory (otherwise later provisioning will fail)
     shell: "sudo chown -R vagrant {{ conda_dir }}/"
+    ignore_errors: yes
 
   - name: openwind | create file activate.d/env_vars.sh in conda env
     file:
@@ -69,13 +70,13 @@
 
   - name: openwind | Sync script heading
     lineinfile:
-        path: /home/vagrant/daily_sync.sh
+        path: "{{ project_home }}/daily_sync.sh"
         insertbefore: BOF
         line: "#!/bin/bash"
 
   - name: openwind | Sync script content
     blockinfile:
-        path: /home/vagrant/daily_sync.sh
+        path: "{{ project_home }}/daily_sync.sh"
         block: |
             export PROJ_LIB={{ conda_dir }}/envs/{{ env_name }}/share/proj
             source {{ conda_dir }}/bin/activate {{ env_name }}
