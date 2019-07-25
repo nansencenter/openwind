@@ -32,7 +32,7 @@
 
       - role: openwind
         dev_sources_dir: '{{ project_home }}'
-        nansat_version: 'issue391_s2_opendap_mapper'
+        nansat_version: 'master'
         python_dist_packages: "{{ conda_dir }}/envs/{{ env_name }}/lib/python3.6/site-packages"
       
       - role: localvm
