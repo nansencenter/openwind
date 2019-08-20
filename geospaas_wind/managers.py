@@ -68,6 +68,8 @@ class WindManager(DatasetManager):
 
         # Set global metadata
         metadata['data_center'] = json.dumps(pti.get_gcmd_provider('nersc'))
+        metadata['naming_authority'] = 'no.nersc.sios_infranor'
+        metadata['project'] = 'SIOS InfraNor'
         metadata['entry_title'] = 'Wind field from '+os.path.basename(uri)
         metadata.pop('file_creation_date')
         metadata['history'] = metadata['history'] + ' ' + timezone.now().isoformat() + \
