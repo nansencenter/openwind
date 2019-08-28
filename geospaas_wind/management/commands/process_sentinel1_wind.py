@@ -3,6 +3,7 @@ from dateutil.parser import parse
 from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
 from django.core.exceptions import MultipleObjectsReturned
+from django.core.exceptions import ObjectDoesNotExist
 
 from geospaas.catalog.models import Dataset
 
@@ -41,7 +42,9 @@ class Command(BaseCommand):
         if options['url']:
             s1ds = Dataset.objects.filter(dataseturi__uri=options['url'])
         else:
-            s1ds = Dataset.objects.filter(source__platform__short_name__contains='SENTINEL-1')
+            s1ds = Dataset.objects.filter(
+                        source__platform__short_name__contains='SENTINEL-1'
+                    ).exclude(dataseturi__uri__contains='WIND')
         if options['date']:
             tt = parse(options['date'])
             tt = timezone.datetime(tt.year, tt.month, tt.day, tzinfo=pytz.utc)
@@ -56,7 +59,7 @@ class Command(BaseCommand):
         for i,ds in enumerate(s1ds):
             try:
                 dsuri = ds.dataseturi_set.get(service='OPENDAP')
-            except MultipleObjectsReturned:
+            except MultipleObjectsReturned as e:
                 failed += 1
                 continue
             wds, cr = WindDataset.objects.process(dsuri.uri, force=options['force_reprocessing'],
