@@ -17,6 +17,8 @@ class Command(BaseCommand):
             --date <date>: Select Sentinel-1 datasets by date (yyyy-mm-dd)
             --url <str>: Select Sentinel-1 dataset by url
             --force-reprocessing: Force reprocessing of SAR wind
+            --data-center: GCMD provider shortname
+            --naming-authority: Dataset naming authority
 
         Example: 
             Process all Sentinel-1 datasets on 2019-07-01 (the datasets must have been added to the
@@ -32,6 +34,8 @@ class Command(BaseCommand):
         parser.add_argument('--force-reprocessing', action='store_true', default=False,
                 help='Force reprocessing')
         parser.add_argument('--url', type=str, default='', help='URL of OPeNDAP dataset')
+        parser.add_argument('--data-center', type=str, default='', help='GCMD provider shortname')
+        parser.add_argument('--naming-authority', type=str, default='', help='Dataset naming authority')
 
 
     def handle(self, *args, **options):
@@ -58,7 +62,8 @@ class Command(BaseCommand):
             except MultipleObjectsReturned as e:
                 failed += 1
                 continue
-            wds, cr = WindDataset.objects.process(dsuri.uri, force=options['force_reprocessing'])
+            wds, cr = WindDataset.objects.process(dsuri.uri, force=options['force_reprocessing'],
+                    data_center=options['data_center'], naming_authority=options['naming_authority'])
             if cr:
                 self.stdout.write('Successfully processed (%d/%d): %s\n' % (i+1, numds, dsuri.uri))
                 ingested += 1

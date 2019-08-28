@@ -88,5 +88,5 @@
             # Sync Arome Arctic
             {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py ingest_thredds_crawl https://thredds.met.no/thredds/catalog/aromearcticarchive/`date -d "yesterday 00:00" '+%Y/%m/%d'`/catalog.html --filename arome_arctic_vtk.*
             # Process S1 wind
-            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py process_sentinel1_wind --date `date -d "yesterday 00:00" '+%Y-%m-%d'`
+            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py process_sentinel1_wind --date `date -d "yesterday 00:00" '+%Y-%m-%d'` --data-center nersc --naming-authority no.nersc.sios_infranor
 
