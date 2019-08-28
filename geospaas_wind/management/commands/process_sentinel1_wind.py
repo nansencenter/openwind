@@ -60,7 +60,7 @@ class Command(BaseCommand):
                 failed += 1
                 continue
             wds, cr = WindDataset.objects.process(dsuri.uri, force=options['force_reprocessing'],
-                    data_center=options['data-center'], naming_authority=options['naming_authority'])
+                    data_center=options['data_center'], naming_authority=options['naming_authority'])
             if cr:
                 self.stdout.write('Successfully processed (%d/%d): %s\n' % (i+1, numds, dsuri.uri))
                 ingested += 1

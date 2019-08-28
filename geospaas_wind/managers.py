@@ -2,6 +2,7 @@ import os, warnings
 import json
 import numpy as np
 import tempfile
+from dateutil.parser import parse
 
 import pythesint as pti
 
@@ -27,11 +28,6 @@ class WindManager(DatasetManager):
         if DatasetURI.objects.filter(uri__contains=fn) and not force:
             wds = Dataset.objects.filter(dataseturi__uri__contains=fn)[0]
             return wds, False
-
-        import ipdb
-        ipdb.set_trace()
-        thredds_fn = os.path.join(settings.PRODUCTS_ROOT, fn)
-        wind_uri = 'file://localhost' + thredds_fn
 
         try:
             w = wind_from_sar_and_arome_forecast(uri)
@@ -69,8 +65,8 @@ class WindManager(DatasetManager):
         #w.reproject(d, tps=True)
 
         # Set global metadata
-        metadata['data_center'] = json.dumps(pti.get_gcmd_provider(kwargs.pop('data_center', 'nersc')))
-        metadata['naming_authority'] = kwargs.pop('naming_authority', 'no.nersc.sios_infranor')
+        metadata['data_center'] = json.dumps(pti.get_gcmd_provider(kwargs.pop('data_center', '')))
+        metadata['naming_authority'] = kwargs.pop('naming_authority', '')
         metadata['project'] = 'SIOS InfraNor'
         metadata['entry_title'] = 'Wind field from '+os.path.basename(uri)
         metadata.pop('file_creation_date')
@@ -87,7 +83,21 @@ class WindManager(DatasetManager):
         metadata['summary'] = 'Near surface (10m) wind from Arome Arctic forecast wind and ' + metadata['summary']
         metadata['title'] = 'Near surface wind from '+metadata['title']
 
+	# Get or create data folder
+        start_time = parse(metadata['time_coverage_start'])
+        yfolder = os.path.join(settings.PRODUCTS_ROOT, '{:04d}'.format(start_time.year))
+        mfolder = os.path.join(yfolder, '{:02d}'.format(start_time.month))
+        dfolder = os.path.join(mfolder, '{:02d}'.format(start_time.day))
+        if not os.path.isdir(yfolder):
+            os.mkdir(yfolder)
+        if not os.path.isdir(mfolder):
+            os.mkdir(mfolder)
+        if not os.path.isdir(dfolder):
+            os.mkdir(dfolder)
+
         # Export
+        thredds_fn = os.path.join(dfolder, fn)
+        wind_uri = 'file://localhost' + thredds_fn
         ww.export2thredds(thredds_fn, mask_name='swathmask', metadata=metadata, no_mask_value=1)
         wds, cr = super(WindManager, self).get_or_create(wind_uri)
         
