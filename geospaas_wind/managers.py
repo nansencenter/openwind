@@ -28,6 +28,8 @@ class WindManager(DatasetManager):
             wds = Dataset.objects.filter(dataseturi__uri__contains=fn)[0]
             return wds, False
 
+        import ipdb
+        ipdb.set_trace()
         thredds_fn = os.path.join(settings.PRODUCTS_ROOT, fn)
         wind_uri = 'file://localhost' + thredds_fn
 
@@ -67,8 +69,8 @@ class WindManager(DatasetManager):
         #w.reproject(d, tps=True)
 
         # Set global metadata
-        metadata['data_center'] = json.dumps(pti.get_gcmd_provider('nersc'))
-        metadata['naming_authority'] = 'no.nersc.sios_infranor'
+        metadata['data_center'] = json.dumps(pti.get_gcmd_provider(kwargs.pop('data_center', 'nersc')))
+        metadata['naming_authority'] = kwargs.pop('naming_authority', 'no.nersc.sios_infranor')
         metadata['project'] = 'SIOS InfraNor'
         metadata['entry_title'] = 'Wind field from '+os.path.basename(uri)
         metadata.pop('file_creation_date')
