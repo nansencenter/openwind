@@ -21,6 +21,8 @@
           - django_forms_bootstrap
           - leaflet
           - geospaas_wind
+          - metno_obs_stations
+          - metno_buoys
         django_urlpatterns:
           - "path('', include('geospaas.urls')),"
 
