@@ -7,7 +7,7 @@ dependencies:
   - django
   - binutils
   - pyproj
-  - gdal=2.4
+  - gdal=2.2
   - libspatialite
   - pythesint
   - nansat
