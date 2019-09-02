@@ -11,7 +11,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   config.vm.define "openwind", primary: true do |openwind|
     openwind.vm.network :private_network, ip: "192.168.33.10"
-    openwind.vm.network "forwarded_port", guest: 8888, host: 8888
+    openwind.vm.network "forwarded_port", guest: 8888, host: 9090
   end
 
 

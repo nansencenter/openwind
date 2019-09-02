@@ -27,112 +27,58 @@
     lineinfile:
         path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/activate.d/env_vars.sh"
         line: "export PROJ_LIB={{ conda_dir }}/envs/{{ env_name }}/share/proj"
-  
-  #- name: openwind | create file deactivate.d/env_vars.sh in conda env
-  #  file:
-  #    path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/deactivate.d/env_vars.sh"
-  #    state: touch
-  #    mode: u=rw,g=r,o=r
-  # 
-  #  - name: openwind | Set comment in environment variable file
-  #    lineinfile:
-  #        path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/deactivate.d/env_vars.sh"
-  #        line: "#!/bin/bash"
-  #  
-  #  - name: openwind | Unset PYTHONPATH environment variable when deactivating env
-  #    lineinfile:
-  #        path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/deactivate.d/env_vars.sh"
-  #        line: "unset PYTHONPATH=/vagrant:{{ project_home }}:{{ project_home }}/{{ project_name }}"
-  #  
-  #  - name: openwind | Unset PROJ_LIB environment variable when deactivating env
-  #    lineinfile:
-  #        path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/deactivate.d/env_vars.sh"
-  #        line: "unset PROJ_LIB={{ conda_dir }}/envs/{{ env_name }}/share/proj"
-  
-  - name: openwind | create shell script to run jupyter notebook
+
+  - name: openwind | Create /etc/rc.local
     file:
-      path: /home/vagrant/run_jupyter.sh
-      state: touch
-      mode: u=rwx,g=r,o=r
+        path: /etc/rc.local
+        state: touch
+    become: true
 
-  - name: openwind | Set header in run_jupyter.sh script
+  - name: openwind | rc.local heading
     lineinfile:
-        path: /home/vagrant/run_jupyter.sh
+        path: /etc/rc.local
         insertbefore: BOF
-        line: "#!/bin/bash"
-
-  - name: openwind | Wait a little before activating env and starting jupyter
-    lineinfile:
-        path: /home/vagrant/run_jupyter.sh
-        line: sleep 60
-
-  - name: openwind | Line to activate virtual env in shell script
-    lineinfile:
-        path: /home/vagrant/run_jupyter.sh
-        line: "source {{ conda_dir }}/bin/activate {{ env_name }}"
-  
-  - name: openwind | Line to start jupyter in shell script
-    lineinfile:
-        path: /home/vagrant/run_jupyter.sh
-        line: "{{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/notebooks/ --NotebookApp.token=vagrant"
-
-  - name: openwind | Set cron shell to bash 
-    cron: 
-        name: SHELL
-        env: yes
-        job: /bin/bash
-  
-  - name: openwind | Add Jupyter Notebook to crontab
-    cron: 
-        name: "Jupyter Notebook"
-        special_time: reboot
-        job: "/home/vagrant/run_jupyter.sh"
-  
-  - name: openwind | Check if Jupyter is running
-    shell: ps aux | grep jupyter | grep -v grep
-    ignore_errors: yes
-    changed_when: false
-    register: jupyter_status
-  
-  - name: openwind | Launch Jupyter Notebook
-    shell: "nohup /home/vagrant/run_jupyter.sh > /dev/null 2>&1 &"
-    when: jupyter_status.rc != 0
-
-  - name: openwind | Create shell script for daily data sync and wind processing
-    file:
-      path: /home/vagrant/daily_sync.sh
-      state: touch
-      mode: u=rwx,g=r,o=r
-
-  - name: openwind | Sync script heading
-    lineinfile:
-        path: /home/vagrant/daily_sync.sh
-        insertbefore: BOF
-        line: "#!/bin/bash"
-
-  - name: openwind | Sync script content
+        line: "#!/bin/sh -e"
+ 
+  - name: openwind | rc.local content
     blockinfile:
-        path: /home/vagrant/daily_sync.sh
+        path: /etc/rc.local
         block: |
-            export PROJ_LIB={{ conda_dir }}/envs/{{ env_name }}/share/proj
-            source {{ conda_dir }}/bin/activate {{ env_name }}
-            cd {{ project_home }}/{{ project_name }}
-            # Sync S1A
-            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py ingest_thredds_crawl http://nbstds.met.no/thredds/catalog/NBS/S1A/`date -d "yesterday 00:00" '+%Y/%m/%d'`/catalog.html
-            # Sync S1B
-            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py ingest_thredds_crawl http://nbstds.met.no/thredds/catalog/NBS/S1B/`date -d "yesterday 00:00" '+%Y/%m/%d'`/catalog.html
-            # Sync Arome Arctic
-            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py ingest_thredds_crawl https://thredds.met.no/thredds/catalog/aromearcticarchive/`date -d "yesterday 00:00" '+%Y/%m/%d'`/catalog.html --filename arome_arctic_vtk.*
-            # Process S1 wind
-            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py process_sentinel1_wind --date `date -d "yesterday 00:00" '+%Y-%m-%d'` --data-center nersc --naming-authority no.nersc.sios_infranor
+            exec 1>/tmp/rc.local.log 2>&1  # send stdout and stderr from rc.local to a log file
+            set -x
+            su vagrant -c "{{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/ --NotebookApp.token=vagrant" &
+            exit 0
+    become: true
+ 
+        #  - name: openwind | Create shell script for daily data sync and wind processing
+        #    file:
+        #      path: /home/vagrant/daily_sync.sh
+        #      state: touch
+        #      mode: u=rwx,g=r,o=r
+        #
+        #  - name: openwind | Sync script heading
+        #    lineinfile:
+        #        path: /home/vagrant/daily_sync.sh
+        #        insertbefore: BOF
+        #        line: "#!/bin/bash"
+        #
+        #  - name: openwind | Sync script content
+        #    blockinfile:
+        #        path: /home/vagrant/daily_sync.sh
+        #        block: |
+        #            export PROJ_LIB={{ conda_dir }}/envs/{{ env_name }}/share/proj
+        #            source {{ conda_dir }}/bin/activate {{ env_name }}
+        #            cd {{ project_home }}/{{ project_name }}
+        #            # Sync S1A
+        #            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py ingest_thredds_crawl http://nbstds.met.no/thredds/catalog/NBS/S1A/`date -d "yesterday 00:00" '+%Y/%m/%d'`/catalog.html
+        #            # Sync S1B
+        #            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py ingest_thredds_crawl http://nbstds.met.no/thredds/catalog/NBS/S1B/`date -d "yesterday 00:00" '+%Y/%m/%d'`/catalog.html
+        #            # Sync Arome Arctic
+        #            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py ingest_thredds_crawl https://thredds.met.no/thredds/catalog/aromearcticarchive/`date -d "yesterday 00:00" '+%Y/%m/%d'`/catalog.html --filename arome_arctic_vtk.*
+        #            # Process S1 wind
+        #            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py process_sentinel1_wind --date `date -d "yesterday 00:00" '+%Y-%m-%d'` --data-center nersc --naming-authority no.nersc.sios_infranor
 
 
-  #  shell: "source activate {{ env_name }}; nohup {{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/notebooks/ --NotebookApp.token=vagrant > /dev/null 2>&1 &"
-
-  #- name: Nansat Setup Python | Check if numpy is imported
-  #  shell: "nosetests test_import.py"
-  #  args:
-  #    chdir: "{{ shared_dir }}"
 
   #- name: openwind | Update/checkout Nansat
   #  git: repo=https://github.com/nansencenter/nansat
