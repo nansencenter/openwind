@@ -28,26 +28,26 @@
         path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/activate.d/env_vars.sh"
         line: "export PROJ_LIB={{ conda_dir }}/envs/{{ env_name }}/share/proj"
 
-  - name: openwind | Create /etc/rc.local
-    file:
-        path: /etc/rc.local
-        state: touch
-    become: true
+        #  - name: openwind | Create /etc/rc.local
+        #    file:
+        #        path: /etc/rc.local
+        #        state: touch
+        #    become: true
 
-  - name: openwind | rc.local heading
-    lineinfile:
-        path: /etc/rc.local
-        insertbefore: BOF
-        line: "#!/bin/sh -e"
+    #  - name: openwind | rc.local heading
+    #    lineinfile:
+    #        path: /etc/rc.local
+    #        insertbefore: BOF
+    #        line: "#!/bin/sh -e"
  
   - name: openwind | rc.local content
     blockinfile:
         path: /etc/rc.local
+        insertbefore: "exit 0"
         block: |
             exec 1>/tmp/rc.local.log 2>&1  # send stdout and stderr from rc.local to a log file
             set -x
             su vagrant -c "{{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/ --NotebookApp.token=vagrant" &
-            exit 0
     become: true
  
         #  - name: openwind | Create shell script for daily data sync and wind processing
