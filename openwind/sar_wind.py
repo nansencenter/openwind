@@ -22,7 +22,6 @@ except:
     print('WARNING: Matplotlib not available, cannot make plots')
 
 from nansat.nansat import Nansat, Domain, _import_mappers
-from nansatmap.nansatmap import Nansatmap
 from openwind.cmod5n import cmod5n_inverse
 
 class TimeDiffError(Exception):
@@ -506,81 +505,6 @@ class SARWind(Nansat, object):
         if show:
             plt.show()
         return fig
-
-    def save_wind_map_image(self, filename, scale=None, numArrowsRange=10,
-                            landmask=True, colorbar=True, cbar_fontsize=6,
-                            drawgrid=True, title=None, title_fontsize=10,
-                            edgecolor=None, quiverScaleCriteria=None,
-                            tight=True, **kwargs):
-
-        pcolormeshArgs = {'vmin': 0, 'vmax':20}
-        for iKey in pcolormeshArgs.keys():
-            if iKey in kwargs.keys():
-                pcolormeshArgs[iKey] = kwargs.pop(iKey)
-
-        quiverArgs = {'X':None, 'Y':None, 'U':None,
-                      'label':None,
-                      'labelpos':'E', 'coordinates':'figure',
-                      'fontproperties':None, 'width':None}
-        popKeys = []
-        for iKey in quiverArgs:
-            if 'quiver_' + iKey in kwargs.keys():
-                quiverArgs[iKey] = kwargs.pop('quiver_'+iKey)
-            else:
-                popKeys.append(iKey)
-        for key in popKeys:
-            quiverArgs.pop(key)
-
-        nMap = Nansatmap(self, resolution='l',figsize=(5, 8))
-
-        # use wind direction "to" for calculating u and v
-        winddirection = np.mod(self['winddirection'] + 180, 360)
-        windspeed = self['windspeed']
-        windspeedPcolor = np.copy(windspeed)
-
-        # if data has non-value (dark blue), replace to Nan
-        if edgecolor is not None:
-            # Replace the edge color (dark blue) to white
-            windspeedPcolor[windspeedPcolor == edgecolor] = np.NaN
-        # Put colormesh
-        nMap.pcolormesh(windspeedPcolor, **pcolormeshArgs)
-
-        # apply landmask to windspeeds
-        windspeed = np.ma.masked_where(self.watermask(tps=True)[1]==2, windspeed)
-
-        # specify the number of quiver
-        quiPixelSpacing = int(np.round(windspeed.shape[1]/numArrowsRange))
-        numQuiX = int(self.vrt.dataset.RasterXSize / quiPixelSpacing)
-        numQuiY = int(self.vrt.dataset.RasterYSize / quiPixelSpacing)
-
-        # compute maximum wind speed on the sea
-        maxSpeed = max(windspeed[windspeed.mask == False])
-        # compute a scale for quiver lenght
-        scale = None
-        if quiverScaleCriteria is not None:
-            for iKey in quiverScaleCriteria.keys():
-                if eval(iKey %maxSpeed):
-                    scale = quiverScaleCriteria[iKey]
-
-        # Draw quivers
-        Ux = np.sin(np.radians(winddirection)) * windspeed
-        Vx = np.cos(np.radians(winddirection)) * windspeed
-        nMap.quiver(Ux, Vx, scale=scale,
-                    quivectors=(numQuiY, numQuiX), **quiverArgs)
-
-        if colorbar:
-            nMap.add_colorbar(fontsize=cbar_fontsize)
-
-        if drawgrid:
-            nMap.drawgrid()
-
-        if title is not None:
-            plt.title(title, fontsize=title_fontsize)
-
-        if tight:
-            nMap.fig.tight_layout()
-
-        nMap.save(filename, landmask=landmask, **kwargs)
 
     def get_bands_to_export(self, bands):
         if not bands:

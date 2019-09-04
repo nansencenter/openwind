@@ -5,12 +5,12 @@ dependencies:
   - python=3.6
   - scipy
   - django
+  - gdal=2.4
   - binutils
   - pyproj
-  - gdal=2.2
   - libspatialite
   - pythesint
-  - nansat
+  #- nansat
   - nose
   - coveralls
   - mock
@@ -21,3 +21,4 @@ dependencies:
   - basemap-data-hires
   - folium
   - jupyter
+  - pip

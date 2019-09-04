@@ -38,11 +38,21 @@
       mode: 0755
   when: not ipython_history.stat.exists
 
+- name: Local VM | rm ipython history file
+  file:
+      dest: /home/vagrant/.ipython/profile_default/history.sqlite
+      state: absent
+
 - name: Local VM | Create link to ipython history file
   file:
       src: /vagrant/lib/ipython_history.sqlite
       dest: /home/vagrant/.ipython/profile_default/history.sqlite
       state: link
+
+- name: Local VM | rm bash history file
+  file:
+      dest: /home/vagrant/.bash_history
+      state: absent
 
 - name: Local VM | Check if shared bash history file exists in default location
   stat: path=/vagrant/lib/dot_bash_history
