@@ -3,6 +3,13 @@
 #- name: openwind | Add PYTHONPATH to bashrc
 #  lineinfile: dest="/home/vagrant/.bashrc" line="export PYTHONPATH=/vagrant"
 
+  - name: openwind | install git
+    apt: pkg="{{ item }}"
+    become: true
+    with_items:
+            - git
+
+
   - name: openwind | Change owner of anaconda directory (otherwise later provisioning will fail)
     shell: "sudo chown -R vagrant {{ conda_dir }}/"
 
@@ -78,7 +85,49 @@
         #            # Process S1 wind
         #            {{ conda_dir }}/envs/{{ env_name }}/bin/python {{ project_home }}/{{ project_name }}/manage.py process_sentinel1_wind --date `date -d "yesterday 00:00" '+%Y-%m-%d'` --data-center nersc --naming-authority no.nersc.sios_infranor
 
+  - name: openwind | update/checkout django-geo-spaas
+    git: repo=https://github.com/nansencenter/django-geo-spaas
+         dest="{{ project_home }}/django-geo-spaas"
+         version=master
+         update=yes
 
+  - name: openwind | create link from Python dist-packages to geo-spaas
+    file: path='{{ python_dist_packages }}/geospaas'
+          src='{{ project_home }}/django-geo-spaas/geospaas'
+          state=link
+          force=yes
+
+  - name: openwind | Update/checkout metno-obs-stations
+    git: repo=https://github.com/nansencenter/django-geo-spaas-metno-observation-stations
+         dest="{{ project_home }}/django-geo-spaas-metno-observation-stations"
+         version=master
+         update=yes
+    register: git_metno_obs_stations
+    tags:
+      - update_metno_obs_stations
+    ignore_errors: no
+
+  - name: openwind | Create link from Python dist-packages to metno_obs_stations
+    file: path='{{ python_dist_packages }}/metno_obs_stations'
+          src='{{ project_home }}/django-geo-spaas-metno-observation-stations/metno_obs_stations'
+          state=link
+          force=yes
+
+  - name: openwind | Update/checkout metno-buoys
+    git: repo=https://github.com/nansencenter/django-geo-spaas-metno-buoys
+         dest="{{ project_home }}/django-geo-spaas-metno-buoys"
+         version=master
+         update=yes
+    register: git_metno_buoys
+    tags:
+      - update_metno_buoys
+    ignore_errors: no
+
+  - name: openwind | Create link from Python dist-packages to metno_buoys
+    file: path='{{ conda_dir }}/envs/{{ env_name }}/lib/python3.6/site-packages/metno_buoys'
+          src='{{ project_home }}/django-geo-spaas-metno-buoys/metno_buoys'
+          state=link
+          force=yes
 
   #- name: openwind | Update/checkout Nansat
   #  git: repo=https://github.com/nansencenter/nansat
