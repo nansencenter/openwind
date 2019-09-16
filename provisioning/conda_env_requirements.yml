@@ -6,11 +6,11 @@ dependencies:
   - scipy
   - django
   - gdal=2.4
-  - binutils
+    #  - binutils
   - pyproj
   - libspatialite
   - pythesint
-  #- nansat
+    #  #- nansat
   - nose
   - coveralls
   - mock
@@ -22,3 +22,4 @@ dependencies:
   - folium
   - jupyter
   - pip
+  #  - git

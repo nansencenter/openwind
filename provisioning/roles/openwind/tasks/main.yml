@@ -3,50 +3,28 @@
 #- name: openwind | Add PYTHONPATH to bashrc
 #  lineinfile: dest="/home/vagrant/.bashrc" line="export PYTHONPATH=/vagrant"
 
-  - name: openwind | install git
-    apt: pkg="{{ item }}"
-    become: true
-    with_items:
-            - git
-
+#- name: openwind | install git
+#    apt: pkg=git
+#    become: true
 
   - name: openwind | Change owner of anaconda directory (otherwise later provisioning will fail)
     shell: "sudo chown -R vagrant {{ conda_dir }}/"
 
-  - name: openwind | create file activate.d/env_vars.sh in conda env
-    file:
-      path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/activate.d/env_vars.sh"
-      state: touch
-      mode: u=rw,g=r,o=r
-  
-  - name: openwind | Set comment in environment variable file
-    lineinfile:
-        path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/activate.d/env_vars.sh"
-        insertbefore: BOF
-        line: "#!/bin/bash"
-  
   - name: openwind | Set PYTHONPATH environment variable required by Nansat for use in Jupyter
     lineinfile:
-        path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/activate.d/env_vars.sh"
+        path: /home/vagrant/.profile
         line: "export PYTHONPATH=/vagrant:{{ project_home }}:{{ project_home }}/{{ project_name }}"
   
   - name: openwind | Set PROJ_LIB environment variable required by Nansat for use in Jupyter
     lineinfile:
-        path: "{{ conda_dir }}/envs/{{ env_name }}/etc/conda/activate.d/env_vars.sh"
+        path: /home/vagrant/.profile
         line: "export PROJ_LIB={{ conda_dir }}/envs/{{ env_name }}/share/proj"
 
-        #  - name: openwind | Create /etc/rc.local
-        #    file:
-        #        path: /etc/rc.local
-        #        state: touch
-        #    become: true
+  - name: openwind | Set PROJ_LIB environment variable required by Nansat for use in Jupyter
+    lineinfile:
+        path: /home/vagrant/.profile
+        line: "export DJANGO_SETTINGS_MODULE=project.settings"
 
-    #  - name: openwind | rc.local heading
-    #    lineinfile:
-    #        path: /etc/rc.local
-    #        insertbefore: BOF
-    #        line: "#!/bin/sh -e"
- 
   - name: openwind | rc.local content
     blockinfile:
         path: /etc/rc.local
@@ -54,6 +32,7 @@
         block: |
             exec 1>/tmp/rc.local.log 2>&1  # send stdout and stderr from rc.local to a log file
             set -x
+            . /home/vagrant/.profile
             su vagrant -c "{{ conda_dir }}/envs/{{ env_name }}/bin/jupyter-notebook --ip=0.0.0.0 --no-browser --notebook-dir=/vagrant/ --NotebookApp.token=vagrant" &
     become: true
  
@@ -129,6 +108,11 @@
           state=link
           force=yes
 
+  - name: openwind | Install gcc
+    apt:
+        name: gcc
+    become: true
+
   - name: openwind | Update/checkout Nansat
     git: repo=https://github.com/nansencenter/nansat
          dest="{{ dev_sources_dir }}/nansat/"
@@ -139,19 +123,19 @@
       - update-nansat
     ignore_errors: no
   
-  #- name: openwind | Clean Nansat (always run to keep the pixel functions updated)
-  #  shell: 'python setup.py clean --all'
-  #  args:
-  #    chdir: '{{ dev_sources_dir }}/nansat'
-  #  tags:
-  #    - update-nansat
-  #
-  #- name: openwind | Install Nansat (always run to keep the pixel functions updated)
-  #  shell: 'python setup.py build_ext --inplace'
-  #  args:
-  #    chdir: '{{ dev_sources_dir }}/nansat'
-  #  tags:
-  #    - update-nansat
+  - name: openwind | Clean Nansat (always run to keep the pixel functions updated)
+    shell: 'python setup.py clean --all'
+    args:
+      chdir: '{{ dev_sources_dir }}/nansat'
+    tags:
+      - update-nansat
+  
+  - name: openwind | Install Nansat (always run to keep the pixel functions updated)
+    shell: 'python setup.py build_ext --inplace'
+    args:
+      chdir: '{{ dev_sources_dir }}/nansat'
+    tags:
+      - update-nansat
 
   - name: openwind | Create link from Python dist-packages to nansat
     file: path='{{ python_dist_packages }}/nansat'
