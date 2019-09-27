@@ -34,7 +34,7 @@
 
       - role: openwind
         dev_sources_dir: '{{ project_home }}'
-        nansat_version: 'master'
+        nansat_version: 'hotfix432_s1_wind_mapper' #'master'
         python_dist_packages: "{{ conda_dir }}/envs/{{ env_name }}/lib/python3.6/site-packages"
       
       - role: localvm
