@@ -15,6 +15,8 @@ import numpy as np
 import cdsapi
 from nansat import Nansat
 from pathlib import Path
+from typing import Union, Optional, Tuple
+from numpy.typing import NDArray
 
 
 def direction_from(u, v):
@@ -62,8 +64,8 @@ def fetch_era5_data(timestamp, central_lat, central_lon, dst, pad=5):
         'year': f'{timestamp.year}',
         'day': f'{timestamp.day:02d}',
         'time': f'{timestamp:%H}:00',
-        'area': [central_lat - 5, central_lon - 5, 
-                 central_lat + 5, central_lon + 5]}
+        'area': [central_lat - pad, central_lon - pad, 
+                 central_lat + pad, central_lon + pad]}
     # Connect to the client
     cds_client = cdsapi.Client()
     # Create dst uri
@@ -74,19 +76,27 @@ def fetch_era5_data(timestamp, central_lat, central_lon, dst, pad=5):
     return dst_uri
 
 
-def preprocess_era5(uri, dst_geometry=None):
+def preprocess_era5_data(
+        source: Union[str, Path, Nansat], 
+        dst_geometry: Optional[Nansat] = None
+    ) -> Tuple[NDArray, NDArray]:
     """
     Read the ERA5 dataset and extract wind speed and direction
     
-    :param uri: /path/to/era5_file.nc
-    :param dst_geometry: destination grid (nansat objec). Bilinear resampling is applied.
+    :param uri: /path/to/era5_file that can be opened with nansat or Nansat object
+    :param dst_geometry: destination grid. Bilinear resampling is applied.
         geometry can me S1 frame opened in Nansat or nansat Domain generated from lon lat grids
-    :returns wind_spd, wind_dir: numpy arrays with wind speed (in m/s) and direction in deg
+    :returns wind_spd, wind_dir: numpy arrays with wind speed in m/s and direction in deg
         (direction from)
     """
-    print(f'>> Processing {uri}')
-    # Read era5 data (netCDF) using Nansat
-    era5_ds = Nansat(str(uri))
+    # If source is path to the file then read the data using Nansat
+    if isinstance(source, (str, Path)):
+        print(f'>> Reading {source}')
+        # Read era5 data using Nansat
+        era5_ds = Nansat(str(source))
+    # If source is nansat type object then use it for the processing directly 
+    else:
+        era5_ds = source
     # If dst geometry provided then reproject era5 data to the dst geometry
     if dst_geometry is not None:
         # Resample using bilinear interpolation
