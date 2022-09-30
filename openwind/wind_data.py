@@ -47,7 +47,7 @@ def magnitude(u, v):
 def wind2sar_direction(
         wind_dir: Union[int, float, NDArray],
         look_dir: Union[int, float, NDArray]
-    ) -> Union(NDArray, float):
+    ) -> Union[NDArray, float]:
     """
     Reproject wind direction from geographic (where 0 deg. is northward wind) to SAR
     antenna look direction (where 0 deg. is wind towards SAR)
@@ -61,10 +61,10 @@ def wind2sar_direction(
 
 def fetch_era5_data(
         timestamp: datetime,
-        central_lat: Union(int, float),
-        central_lon: Union(int, float),
-        dst: Union(str, Path),
-        pad: Union(int, float) = 5
+        central_lat: Union[int, float],
+        central_lon: Union[int, float],
+        dst: Union[str, Path],
+        pad: Union[int, float] = 5
     ) -> Path:
     """
     Download ERA5 reanalysis wind field at 10 m (u and v components) from the Copernicus 

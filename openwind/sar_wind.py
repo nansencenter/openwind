@@ -2,7 +2,7 @@ from numpy.typing import NDArray
 from typing import Union, Optional, Tuple
 from nansat import Nansat
 from openwind.sar_data import preprocess_sar_data
-from openwind.wind_data import preprocess_era5_data, wind2sar_direction, fetch_era5_data
+from openwind.wind_data import preprocess_wind_data, wind2sar_direction, fetch_era5_data
 from openwind.gmf.cmod5n import cmod5n_inverse
 from openwind.utils import round_time
 from pathlib import Path
@@ -34,16 +34,24 @@ def derive_sar_wind(
     :returns sar_wind_spd, aux_wind_dir: SAR derived wind speed in m/s and aux wind direction 
 
     """
+    
+    print(f'>> SAR source: {sar_source.filename if isinstance(sar_source, Nansat) else sar_source}')
+    print(f'>> WIND source: {wind_source.filename if isinstance(wind_source, Nansat) else wind_source}')
+    # If provided input is path to a file then read and process the data
     if isinstance(sar_source, (str, Path)):
+        print(f'>> Read SAR data')
         # Ensure that the path to the source file is Path object
         sar_source = Path(sar_source)
         # Import and preprocess SAR data. 
         # NOTE: To acquire better results do processing on full resolution and then 
         # resample inversed wind
         sar_data = preprocess_sar_data(sar_source, denoise_alg=denoise_alg, dst_px_size=pixel_size_m)
-    else:   
+    # If provided source is nansat object then use it for wind inversion
+    elif isinstance(sar_source, Nansat):   
         sar_data = sar_source
-
+    else:
+        raise TypeError
+    # Specify name of the sigma0 band in SAR dataset
     if Path(sar_data.filename).name.startswith('S1') and denoise_alg is not None:
         sigma0_bandname = 'sigma0_vv_denoised'
     else:
@@ -61,7 +69,7 @@ def derive_sar_wind(
                                       central_lon, central_lat, export_dst)
     # Import wind model field, reproject, and extract wind speed and direction.     
     # NOTE: Wind speed is not used for the wind inversion
-    aux_wind_spd, aux_wind_dir = preprocess_era5_data(wind_source, dst_geometry=sar_data)
+    aux_wind_spd, aux_wind_dir = preprocess_wind_data(wind_source, dst_geometry=sar_data)
     # Reproject wind direction to SAR antenna look direction
     aux_wind2sar_dir = wind2sar_direction(aux_wind_dir, look_dir)
     # Inverse wind speed from provided data
