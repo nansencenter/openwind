@@ -64,7 +64,8 @@ def fetch_era5_data(
         central_lat: Union(int, float),
         central_lon: Union(int, float),
         dst: Union(str, Path),
-        pad: Union(int, float) = 5):
+        pad: Union(int, float) = 5
+    ) -> Path:
     """
     Download ERA5 reanalysis wind field at 10 m (u and v components) from the Copernicus 
     Climate Change Service (https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis
@@ -97,14 +98,15 @@ def fetch_era5_data(
     return dst_uri
 
 
-def preprocess_era5_data(
+def preprocess_wind_data(
         source: Union[str, Path, Nansat], 
         dst_geometry: Optional[Nansat] = None
     ) -> Tuple[NDArray, NDArray]:
     """
-    Read the ERA5 dataset and extract wind speed and direction
+    Read wind dataset and extract wind speed and direction.
+    NOTE: Only ERA5 is supported at the moment
     
-    :param uri: /path/to/era5_file that can be opened with nansat or Nansat object
+    :param uri: /path/to/wind/file that can be opened with nansat or Nansat object
     :param dst_geometry: destination grid. Bilinear resampling is applied.
         geometry can me S1 frame opened in Nansat or nansat Domain generated from lon lat grids
     :returns wind_spd, wind_dir: numpy arrays with wind speed in m/s and direction in deg
@@ -114,15 +116,15 @@ def preprocess_era5_data(
     if isinstance(source, (str, Path)):
         print(f'>> Reading {source}')
         # Read era5 data using Nansat
-        era5_ds = Nansat(str(source))
+        wind_data = Nansat(str(source))
     # If source is nansat type object then use it for the processing directly 
     else:
-        era5_ds = source
+        wind_data = source
     # If dst geometry provided then reproject era5 data to the dst geometry
     if dst_geometry is not None:
         # Resample using bilinear interpolation
-        era5_ds.reproject(dst_geometry, resample_alg=1)
+        wind_data.reproject(dst_geometry, resample_alg=1)
     # Calculate wind speed and direction from u and v components provided in model
-    wind_spd = magnitude(era5_ds['u10'], era5_ds['v10'])
-    wind_dir = direction_from(era5_ds['u10'], era5_ds['v10'])
+    wind_spd = magnitude(wind_data['u10'], wind_data['v10'])
+    wind_dir = direction_from(wind_data['u10'], wind_data['v10'])
     return wind_spd, wind_dir
