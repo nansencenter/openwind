@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def measure_time(func):
@@ -20,3 +20,18 @@ def check_inputs(func):
         result = func(**kwargs)
         return result
     return wrapper
+
+
+def round_time(timestamp: datetime) -> datetime:
+    """
+    Round datetime to the nearest hour
+
+    :param timestamp: input datetime
+    :returns timestamp: datetime rounded to the nearest hour
+    """
+    # If minutes are more then 30 then add an hour
+    if timestamp.minute >= 30:
+        timestamp = timestamp + timedelta(hours=1)
+    # Set minutes seconds and microseconds to 0
+    timestamp = timestamp.replace(microsecond=0, second=0, minute=0)
+    return timestamp
