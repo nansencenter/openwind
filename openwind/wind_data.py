@@ -17,6 +17,7 @@ from nansat import Nansat
 from pathlib import Path
 from typing import Union, Optional, Tuple
 from numpy.typing import NDArray
+from datetime import datetime
 
 
 def direction_from(u, v):
@@ -58,7 +59,12 @@ def wind2sar_direction(
     return np.mod(wind_dir - look_dir, 360)
 
 
-def fetch_era5_data(timestamp, central_lat, central_lon, dst, pad=5):
+def fetch_era5_data(
+        timestamp: datetime,
+        central_lat: Union(int, float),
+        central_lon: Union(int, float),
+        dst: Union(str, Path),
+        pad: Union(int, float) = 5):
     """
     Download ERA5 reanalysis wind field at 10 m (u and v components) from the Copernicus 
     Climate Change Service (https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis
