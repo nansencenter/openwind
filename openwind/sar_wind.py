@@ -4,7 +4,7 @@ from nansat import Nansat
 from openwind.sar_data import preprocess_sar_data
 from openwind.wind_data import preprocess_wind_data, wind2sar_direction, fetch_era5_data
 from openwind.gmf.cmod5n import cmod5n_inverse
-from openwind.utils import round_time
+from openwind.utils import round_time, create_argparser
 from pathlib import Path
 import numpy as np
 
@@ -12,9 +12,9 @@ import numpy as np
 def derive_sar_wind(
         sar_source: Union[str, Path, Nansat],
         wind_source: Union[str, Path, Nansat, None],
-        pixel_size_m: Union[int, float] = None,
-        denoise_alg: Optional[str] = None,
         wind_gmf: str = 'CMOD5n',
+        pixel_size_m: float = None,
+        denoise_alg: Optional[str] = None,
         export_dst: Optional[Path] = None
     ) -> Tuple[NDArray, NDArray]:
     """
@@ -26,15 +26,13 @@ def derive_sar_wind(
     :param wind_data_src: /path/to/sar/data which can be opened with Nansat 
         or Nansat object or None. If None is provided then ERA5 data will be automatically 
         collocated. 
+    :param wind_gmf: Geophysical Model Function used for the wind inversion. Default CMOD5n
     :param pixel_size_m: pixel size of the final product in meters
     :param denoise_alg: Denoising algorithm name
         NOTE: Only applicable to Sentinel-1 data
     :param export_dst: export wind product to a netcdf
-    :param wind_gmf: export wind product to a netcdf
     :returns sar_wind_spd, aux_wind_dir: SAR derived wind speed in m/s and aux wind direction 
-
     """
-    
     print(f'>> SAR source: {sar_source.filename if isinstance(sar_source, Nansat) else sar_source}')
     print(f'>> WIND source: {wind_source.filename if isinstance(wind_source, Nansat) else wind_source}')
     # If provided input is path to a file then read and process the data
@@ -108,3 +106,32 @@ def inverse_wind_spd(
 
 def _export2netcdf(export_dst):
     pass
+
+
+if __name__ == '__main__':
+    # Import command line argument parser
+    parser = create_argparser()
+    # Parse imput arguments
+    args = parser.parse_args()
+    print(args)
+    # Check input data
+    # At least one sar scene is required for the processing
+    if args.sar_source is None:
+        raise ValueError('Have to provide at least one SAR product')
+    # If no wind_source provided then each SAR product will be automatically collocated
+    # with ERA5 (if possible). If wind source is provided then number of provided wind files
+    # must be equal to the number of input sar products 
+    elif args.wind_source is not None and len(args.wind_source) != len(args.sar_source):
+        raise ValueError('Number of wind files is not equal to number of SAR files')
+    # Retrieve wind field
+    else:
+        # If no wind source is provided then generate a list of None values with
+        # the same length as number of profived SAR products
+        if args.wind_source is None:
+            wind_source = [None for i in range(len(args.sar_source))]
+        else:
+            wind_source = args.wind_source
+        # Iteratively process derive wind product from each of SAR products
+        for i in range(len(args.sar_source)):
+            sar_wind = derive_sar_wind(args.sar_source[i], wind_source[i], 
+                                       args.pixel_size, args.export_dst) 
