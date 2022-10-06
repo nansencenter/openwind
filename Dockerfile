@@ -11,10 +11,6 @@ RUN python -c 'import pythesint as pti; pti.update_all_vocabularies()'
 # Install Sentinel1denoise package
 RUN pip install https://github.com/nansencenter/sentinel1denoised/archive/v1.3.1.tar.gz
 
-RUN groupadd -g 10000 nersc && \
-    useradd -m -r -u 40397 -g nersc artmoi
-USER artmoi
-
 WORKDIR /src
 # Add GDAL related env vars
 ARG GDAL_ENABLE_DEPRECATED_DRIVER_DODS='YES'
