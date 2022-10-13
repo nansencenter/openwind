@@ -104,7 +104,7 @@ def preprocess_sar_data(
         sar_data.add_band(sar_data.remove_thermal_noise('VV', algorithm=denoise_alg),
                           parameters={'name':'sigma0_vv_denoised', 'algorithm': denoise_alg})
     # In case of other SAR data supported by nansat (e.g., RS2, ASAR) no additional 
-    # calibrations applied. 
+    # calibrations applied.     
     else:
         sar_data = Nansat(str(sar_product_uri))
     # Resize (increase/decrease px size) image
@@ -113,6 +113,6 @@ def preprocess_sar_data(
         # Calculate resize factor based on source px size and target px size
         resize_factor = np.mean(sar_data.get_pixelsize_meters()) / dst_px_size
         # Resize image to target resolution using bilinear resampling
-        sar_data.resize(resize_factor, resample_alg=1)
+        sar_data.resize(resize_factor, resample_alg=0)
     
     return sar_data
