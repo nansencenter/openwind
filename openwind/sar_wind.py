@@ -4,7 +4,7 @@ from nansat import Nansat
 from openwind.sar_data import preprocess_sar_data
 from openwind.wind_data import preprocess_wind_data, wind2sar_direction, fetch_era5_data
 from openwind.gmf.cmod5n import cmod5n_inverse
-from openwind.utils import round_time, create_argparser
+from openwind.utils import round_time, create_argparser, measure_time
 from pathlib import Path
 import numpy as np
 import netCDF4 as nc
@@ -13,7 +13,7 @@ from datetime import datetime
 
 def derive_sar_wind(
         sar_source: Union[str, Path, Nansat],
-        wind_source: Union[str, Path, Nansat, None],
+        wind_source: Optional[Union[str, Path, Nansat]] = None,
         wind_gmf: str = 'CMOD5n',
         pixel_size_m: float = None,
         denoise_alg: Optional[str] = None,
@@ -45,7 +45,7 @@ def derive_sar_wind(
         # Import and preprocess SAR data. 
         # NOTE: To acquire better results do inversion on full resolution and then 
         # resample inversed wind.
-        sar_data = preprocess_sar_data(sar_source, denoise_alg=denoise_alg, dst_px_size=300)
+        sar_data = preprocess_sar_data(sar_source, denoise_alg=denoise_alg, dst_px_size=100)
     # If provided source is nansat object then use it for wind inversion
     elif isinstance(sar_source, Nansat):
         print('>> Import SAR data from the source')
@@ -66,7 +66,7 @@ def derive_sar_wind(
     look_dir = sar_data['look_direction']
     # If wind data source is not provided then download ERA5 data
     if wind_source is None:
-        central_lon, central_lat = np.mean(sar_data.get_corners(), axis=1)
+        central_lat, central_lon = np.mean(sar_data.get_corners(), axis=1)
         # Collocate and download ERA5 data and get the uri
         wind_source = fetch_era5_data(round_time(sar_data.time_coverage_start),
                                       central_lon, central_lat, export_dst)
@@ -104,7 +104,7 @@ def inverse_wind_spd(
     :returns sar_wind_spd: Wind speed in m/s
     """
     if gmf_name == 'CMOD5n':
-        sar_wind_spd = cmod5n_inverse(sigma0, wind_dir, incidence, iterations=1)
+        sar_wind_spd = cmod5n_inverse(sigma0, wind_dir, incidence, iterations=10)
     else:
         raise ValueError
     return sar_wind_spd
