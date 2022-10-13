@@ -62,6 +62,6 @@ def create_argparser() -> ArgumentParser:
                              'resolution significantly increases processing coasts (time/memory)' \
                              'If not provided, then default of 1000 m is used')
     parser.add_argument('--export_dst', metavar='/path/to/product/dir', type=str, nargs='?', default='/src',
-                        help='Indicate storage directory for the product. If not provided then' \
-                             'default of /src is used')
+                        help='Indicate storage directory for the wind products (in NetCDF files). ' \
+                             'If not provided then default of /src is used')
     return parser
