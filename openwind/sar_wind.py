@@ -7,6 +7,8 @@ from openwind.gmf.cmod5n import cmod5n_inverse
 from openwind.utils import round_time, create_argparser
 from pathlib import Path
 import numpy as np
+import netCDF4 as nc
+from datetime import datetime
 
 
 def derive_sar_wind(
@@ -37,15 +39,16 @@ def derive_sar_wind(
     print(f'>> WIND source: {wind_source.filename if isinstance(wind_source, Nansat) else wind_source}')
     # If provided input is path to a file then read and process the data
     if isinstance(sar_source, (str, Path)):
-        print(f'>> Read SAR data')
+        print(f'>> Read SAR data from path')
         # Ensure that the path to the source file is Path object
         sar_source = Path(sar_source)
         # Import and preprocess SAR data. 
-        # NOTE: To acquire better results do processing on full resolution and then 
-        # resample inversed wind
-        sar_data = preprocess_sar_data(sar_source, denoise_alg=denoise_alg, dst_px_size=pixel_size_m)
+        # NOTE: To acquire better results do inversion on full resolution and then 
+        # resample inversed wind.
+        sar_data = preprocess_sar_data(sar_source, denoise_alg=denoise_alg, dst_px_size=300)
     # If provided source is nansat object then use it for wind inversion
-    elif isinstance(sar_source, Nansat):   
+    elif isinstance(sar_source, Nansat):
+        print('>> Import SAR data from the source')
         sar_data = sar_source
     else:
         raise TypeError
@@ -56,6 +59,8 @@ def derive_sar_wind(
         sigma0_bandname = 'sigma0_VV'
     # Get arrays of SAR information required for the wind inversion: sigma0, incidence angle,
     # and look direction (required only for reprojecting wind direction)
+    # NOTE: reading of not resized data is way faster than for resized data
+    print(f'>> Import {sigma0_bandname}, incidence angle, and look direction')
     sigma0 = sar_data[sigma0_bandname]
     incidence = sar_data['incidence_angle']
     look_dir = sar_data['look_direction']
@@ -71,11 +76,12 @@ def derive_sar_wind(
     # Reproject wind direction to SAR antenna look direction
     aux_wind2sar_dir = wind2sar_direction(aux_wind_dir, look_dir)
     # Inverse wind speed from provided data
+    print('>> Inverse wind speed')
     sar_wind_spd = inverse_wind_spd(aux_wind2sar_dir, sigma0, incidence, wind_gmf)
     # Export product
     if export_dst is not None:
-        _export2netcdf()
-
+        sar_wind_ds = Nansat.from_domain(sar_data)
+    
     return sar_wind_spd, aux_wind_dir
 
 
@@ -98,17 +104,21 @@ def inverse_wind_spd(
     :returns sar_wind_spd: Wind speed in m/s
     """
     if gmf_name == 'CMOD5n':
-        sar_wind_spd = cmod5n_inverse(sigma0, wind_dir, incidence)
+        sar_wind_spd = cmod5n_inverse(sigma0, wind_dir, incidence, iterations=1)
     else:
         raise ValueError
     return sar_wind_spd
 
 
 def _export2netcdf(export_dst):
+    """
+    """
     pass
 
 
 if __name__ == '__main__':
+    # Record start time of the script
+    start = datetime.now()
     # Import command line argument parser
     parser = create_argparser()
     # Parse imput arguments
@@ -135,3 +145,4 @@ if __name__ == '__main__':
         for i in range(len(args.sar_source)):
             sar_wind = derive_sar_wind(args.sar_source[i], wind_source[i], 
                                        args.pixel_size, args.export_dst) 
+    print(datetime.now() - start)
