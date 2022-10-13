@@ -56,7 +56,8 @@ def wind2sar_direction(
     :param look_dir: SAR antenna look direction
     :returns: Wind direction in deg where 0/180 deg is wind toward/away from antenna
     """
-    return np.mod(wind_dir - look_dir, 360)
+    wind2sar_dir = np.mod(wind_dir - look_dir, 360)
+    return wind2sar_dir
 
 
 def fetch_era5_data(
@@ -91,7 +92,7 @@ def fetch_era5_data(
     # Connect to the client
     cds_client = cdsapi.Client()
     # Create dst uri
-    dst_uri = Path(dst) / f'ERA5_{timestamp:%Y%m%dT%H}00.nc'
+    dst_uri = Path(dst, f'ERA5_{timestamp:%Y%m%dT%H}00.nc')
     print(f'>> Downloading {dst_uri}')
     # Download the data
     cds_client.retrieve('reanalysis-era5-single-levels', cds_query, dst_uri)
@@ -109,7 +110,7 @@ def preprocess_wind_data(
     :param uri: /path/to/wind/file that can be opened with nansat or Nansat object
     :param dst_geometry: destination grid. Bilinear resampling is applied.
         geometry can me S1 frame opened in Nansat or nansat Domain generated from lon lat grids
-    :returns wind_spd, wind_dir: numpy arrays with wind speed in m/s and direction in deg
+    :returns wind_spd, wind_dir: 2D numpy arrays with wind speed in m/s and direction in deg
         (direction from)
     """
     # If source is path to the file then read the data using Nansat
@@ -123,8 +124,10 @@ def preprocess_wind_data(
     # If dst geometry provided then reproject era5 data to the dst geometry
     if dst_geometry is not None:
         # Resample using bilinear interpolation
-        wind_data.reproject(dst_geometry, resample_alg=1)
+        wind_data.reproject(dst_geometry, resample_alg=0)
     # Calculate wind speed and direction from u and v components provided in model
+    # NOTE: ERA5 arrays a 3D with 1 around time dimension 
     wind_spd = magnitude(wind_data['u10'], wind_data['v10'])
     wind_dir = direction_from(wind_data['u10'], wind_data['v10'])
+    
     return wind_spd, wind_dir
