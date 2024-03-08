@@ -1,7 +1,7 @@
 from openwind.utils import measure_time, check_inputs
 import zipfile
 import asf_search as asf
-from s1denoise import Sentinel1Image
+from s1denoise.tools import run_correction
 from nansat import Nansat
 from pathlib import Path
 import numpy as np
@@ -93,7 +93,7 @@ def fetch_asf_s1_data(granule_id=None, query=None, download=False, dst=None, asf
 
 def preprocess_sar_data(
         sar_product_uri: Path,
-        denoise_alg: Optional[str] = None, 
+        denoise_alg: str = 'NERSC', 
         dst_px_size: Optional[float] = None
     ) -> Nansat:
     """
@@ -103,6 +103,7 @@ def preprocess_sar_data(
     :param sar_product_uri: path/to/sar/product
     :param denoise_alg: name of denoising scheme. 
         NOTE: Only rquired for Sentinel-1 data
+        NOTE: Currently only uses default NERSC algorithm
     :param dst_px_size: target pixel size in meters
     :returns sar_data: sar dataset opened in nansat
     """
@@ -110,11 +111,14 @@ def preprocess_sar_data(
     # Sentinel-1 requires additional denoising and hence must be threated separately
     if sar_product_uri.name.startswith('S1') and denoise_alg is not None:
         # Read the Sentinel-1 GRD file and get all aux calibration data
-        sar_data = Sentinel1Image(str(sar_product_uri), mapperName='sentinel1_l1')
+        sar_data = Nansat(str(sar_product_uri), mapperName='sentinel1_l1')
         # Remove thermal noise from the sigma0 and add it as a separate band to the dataset
+        # TODO: Find the way to specify correction algorithm: currently used default NERSC
         print(f'>> Remove noise from sigma0')
-        sar_data.add_band(sar_data.remove_thermal_noise('VV', algorithm=denoise_alg),
-                          parameters={'name':'sigma0_vv_denoised', 'algorithm': denoise_alg})
+        denoised_s0 = run_correction(str(sar_product_uri))
+        # TODO: dynamically specify polarization
+        sar_data.add_band(denoised_s0['sigma0_VV'],
+                          parameters={'name':'sigma0_vv_denoised', 'algorithm': denoise_alg, 'units': 'dB'})
     # In case of other SAR data supported by nansat (e.g., RS2, ASAR) no additional 
     # calibrations applied.     
     else:
@@ -124,7 +128,7 @@ def preprocess_sar_data(
         print(f'>> Resizing image to {dst_px_size} m')
         # Calculate resize factor based on source px size and target px size
         resize_factor = np.mean(sar_data.get_pixelsize_meters()) / dst_px_size
-        # Resize image to target resolution using bilinear resampling
+        # Resize image to target resolution using neares neibour
         sar_data.resize(resize_factor, resample_alg=0)
     
     return sar_data
