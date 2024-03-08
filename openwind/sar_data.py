@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 from typing import Union, Optional
 from numpy.typing import NDArray
+import pythesint as pti
+import xarray as xr
 
 
 def _retrieve_asf_creds(src='/home/artmoi/.asfapirc'):
@@ -132,3 +134,53 @@ def preprocess_sar_data(
         sar_data.resize(resize_factor, resample_alg=0)
     
     return sar_data
+
+
+def _prep_band_metadata(src_name: str) -> dict:
+    # Get CF metadata for the band
+    meta_dict = pti.get_cf_standard_name(src_name)
+    # Add FillValue
+    meta_dict['_FillValue'] = -999.
+    return meta_dict
+
+
+def export2netcdf(
+        sar_ds: Nansat,
+        dst_path: Union[str, Path] = Path('.')
+    ) -> xr.Dataset:
+    """
+    Export Nansat dataset to xarray and write NetCDF (Optional)
+
+    :param sar_ds:   Nansat dataset
+    :param dst_path: path/to/dst/file/dir
+    """
+    print(f'>> Fetch geolocation grids and watermask')
+    # Extract geolocation grids for SAR frame
+    lon_grd, lats_grd = sar_ds.get_geolocation_grids()
+    # Extract MOD44W land/watermask for SAR frame
+    watermask = sar_ds.watermask()
+    # Create output xarray dataset
+    print(f'>> Prepare dataset')
+    out_ds = xr.Dataset(
+        # Add metadata from original SAR acquisition
+        attrs=sar_ds.get_metadata(),
+        # Add coordinate bands
+        coords=dict(
+            lat=(('row', 'col'), lats_grd, _prep_band_metadata('latitude')),
+            lon=(('row', 'col'), lon_grd, _prep_band_metadata('longitude'))),                  
+        data_vars=dict( 
+            sigma0_s1dn=(('row', 'col'), db2linear(sar_ds['sigma0_vv_denoised']), {'polarization': 'VV', '_FillValue': -999.}),
+            sigma0=(('row', 'col'), sar_ds['sigma0_VV'], {'polarization': 'VV', '_FillValue': -999.}),
+            angle_of_incidence=(('row', 'col'), sar_ds['incidence_angle'], _prep_band_metadata('angle_of_incidence')),
+            look_direction=(('row', 'col'), sar_ds['look_direction'], {'_FillValue': -999.}),
+            watermask=(('row', 'col'), watermask[1], {'source': 'MOD44W', '_FillValue': -999.})))
+    # Generate dst path for writing new dataset             
+    out_fname = Path(sar_ds.name).with_suffix('.nc')
+    # Generate full path
+    dst_path = Path(dst_path) / out_fname
+    if dst_path.exists(): dst_path.unlink()
+    # Write NetCDF dataset to the disk
+    print(f'>> Write to: {dst_path}')
+    out_ds.to_netcdf(Path(sar_ds.name).with_suffix('.nc'))
+    out_ds.close()
+    return dst_path
