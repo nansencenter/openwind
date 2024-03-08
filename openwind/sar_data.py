@@ -6,6 +6,7 @@ from nansat import Nansat
 from pathlib import Path
 import numpy as np
 from typing import Union, Optional
+from numpy.typing import NDArray
 
 
 def _retrieve_asf_creds(src='/home/artmoi/.asfapirc'):
@@ -13,6 +14,17 @@ def _retrieve_asf_creds(src='/home/artmoi/.asfapirc'):
         lines = [line.strip().split(': ') for line in f.readlines()]
         creds = {line[0]:line[1] for line in lines}
     return creds
+
+
+def db2linear(s0: NDArray) -> NDArray:
+    """
+    Convert sigma0 from dB to linear units
+
+    :param s0:   sigma0 in dB
+    :returns s0: sigma0 in linear units
+    """
+    s0 = 10**(s0/10)
+    return s0
 
 
 @measure_time
