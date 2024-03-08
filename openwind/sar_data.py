@@ -8,8 +8,8 @@ import numpy as np
 from typing import Union, Optional
 
 
-def _retrieve_asf_creds():
-    with open('/home/artmoi/.asfapirc') as f:
+def _retrieve_asf_creds(src='/home/artmoi/.asfapirc'):
+    with open(src) as f:
         lines = [line.strip().split(': ') for line in f.readlines()]
         creds = {line[0]:line[1] for line in lines}
     return creds
