@@ -67,6 +67,12 @@ def cmod5n_forward(v,phi,theta):
     # when executed on python 3.11
     # SlS0 = [S_vec<S0]
     # S_vec[SlS0]=S0[SlS0]
+    # To reproduce error:
+    # a = np.ones([10, 10]) * 10
+    # b = np.ones([10, 10]) * 9
+    # c = np.ones([10, 10])
+    # d = [a < b]
+    # c[d] = b[d]
     # This must be related to the way boolean index array is defined with a list wrapping
     SlS0 = S_vec < S0
     S_vec[SlS0] = S0[SlS0]
@@ -119,7 +125,7 @@ def cmod5n_inverse(sigma0_obs, phi, incidence, iterations=10):
     
     # First guess wind speed
     V = array([10.])*ones(sigma0_obs.shape)
-    step=10.
+    step=5
     
     # Iterating until error is smaller than threshold
     for iterno in range(1, iterations):

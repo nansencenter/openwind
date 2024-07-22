@@ -45,7 +45,7 @@ def derive_sar_wind(
         # Import and preprocess SAR data. 
         # NOTE: To acquire better results do inversion on full resolution and then 
         # resample inversed wind.
-        sar_data = preprocess_sar_data(sar_source, denoise_alg=denoise_alg, dst_px_size=100)
+        sar_data = preprocess_sar_data(sar_source, denoise_alg=denoise_alg, dst_px_size=300)
     # If provided source is nansat object then use it for wind inversion
     elif isinstance(sar_source, Nansat):
         print('>> Import SAR data from the source')
@@ -146,3 +146,4 @@ if __name__ == '__main__':
             sar_wind = derive_sar_wind(args.sar_source[i], wind_source[i], 
                                        args.pixel_size, args.export_dst) 
     print(datetime.now() - start)
+        

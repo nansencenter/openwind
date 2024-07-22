@@ -3,3 +3,5 @@
 *.png
 test_data/
 .devcontainer/
+.ipynb_checkpoints/
+*.nc

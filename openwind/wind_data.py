@@ -123,8 +123,8 @@ def preprocess_wind_data(
         wind_data = source
     # If dst geometry provided then reproject era5 data to the dst geometry
     if dst_geometry is not None:
-        # Resample using bilinear interpolation
-        wind_data.reproject(dst_geometry, resample_alg=1)
+        # Resample using cubic interpolation
+        wind_data.reproject(dst_geometry, resample_alg=2)
     # Calculate wind speed and direction from u and v components provided in model
     # NOTE: ERA5 arrays a 3D with 1 around time dimension 
     wind_spd = magnitude(wind_data['u10'], wind_data['v10'])

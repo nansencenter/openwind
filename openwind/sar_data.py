@@ -149,7 +149,7 @@ def export2netcdf(
         dst_path: Union[str, Path] = Path('.')
     ) -> xr.Dataset:
     """
-    Export Nansat dataset to xarray and write NetCDF (Optional)
+    Export Nansat dataset to xarray an  d write NetCDF (Optional)
 
     :param sar_ds:   Nansat dataset
     :param dst_path: path/to/dst/file/dir
