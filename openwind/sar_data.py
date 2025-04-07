@@ -11,7 +11,7 @@ import pythesint as pti
 import xarray as xr
 
 
-def _retrieve_asf_creds(src='/home/artmoi/.asfapirc'):
+def _retrieve_asf_creds(src):
     with open(src) as f:
         lines = [line.strip().split(': ') for line in f.readlines()]
         creds = {line[0]:line[1] for line in lines}
