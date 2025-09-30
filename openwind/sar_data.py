@@ -1,5 +1,6 @@
 import logging
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from s1denoise import Sentinel1Image
 from s1denoise.tools import run_correction
@@ -198,21 +199,56 @@ def export2netcdf(
     return dst_path
 
 
-class Sentinel1Source():
+class SARSource():
+    """"""
+    @property
+    def identifier(self):
+        """"""
+        raise NotImplementedError()
+
+    @property
+    def bounding_box(self):
+        """"""
+        raise NotImplementedError()
+
+    @property
+    def start_time(self):
+        """"""
+        raise NotImplementedError()
+
+    @property
+    def end_time(self):
+        """"""
+        raise NotImplementedError()
+
+    @property
+    def properties(self):
+        """"""
+        raise NotImplementedError()
+
+    @property
+    def preprocess(self, out_dir, **kwargs):
+        """"""
+        raise NotImplementedError()
+
+
+class Sentinel1Source(SARSource):
     """"""
     def __init__(self,
-                 asf_product: asf.ASFProduct = None,
-                 data_path:Union[str, Path] = None):
+                 data_path:Union[str, Path] = None,
+                 asf_product: asf.ASFProduct = None):
         self._asf_product = asf_product
         self.data_path = Path(data_path) if data_path is not None else None
-        self.denoised_path = None
+        self.preprocessed_path = None
 
         self._bounding_box = None
         self._start_time = None
         self._end_time = None
 
     @classmethod
-    def from_asf(cls, extent, time_start, time_end, query=None):
+    def from_asf(cls,
+                 extent: Extent, time_start: datetime, time_end: datetime,
+                 query:dict = None):
         """"""
         polygon = ("POLYGON(("
             f"{extent.west} {extent.south},"
@@ -231,7 +267,19 @@ class Sentinel1Source():
                 'intersectsWith': polygon,
             }
         query_set = asf.search(**query)
-        return [cls(asf_product) for asf_product in query_set]
+        return [cls(asf_product=asf_product) for asf_product in query_set]
+
+    @classmethod
+    def from_path(cls, data_path: Union[str, Path] = None):
+        """"""
+        query={
+            'granule_list': [data_path.stem],
+            'processingLevel': asf.PRODUCT_TYPE.GRD_HD,
+        }
+        s1_products = list(asf.search(**query))
+        if len(s1_products) != 1:
+            raise RuntimeError(f"{len(s1_products)} products found, expected one")
+        return cls(data_path=data_path, asf_product=s1_products[0])
 
     @property
     def identifier(self):
@@ -240,8 +288,8 @@ class Sentinel1Source():
             return self._asf_product.properties['sceneName']
         elif self.data_path:
             return self.data_path.stem
-        elif self.denoised_path:
-            return self.denoised_path.stem
+        elif self.preprocessed_path:
+            return self.preprocessed_path.stem
 
     @property
     def bounding_box(self):
@@ -334,7 +382,7 @@ class Sentinel1Source():
                 ).astype(np.float32)
         return denoised
 
-    def denoise(self, out_dir, algorithm='NERSC', polarizations=('VV',)):
+    def preprocess(self, out_dir, algorithm='NERSC', polarizations=('VV',)):
         """"""
         output_path = out_dir / f'denoised_{self.identifier}.nc'
         logger.info("Denoising %s (%s) using %s algorithm",
@@ -383,5 +431,92 @@ class Sentinel1Source():
             )
             s1_dataset.to_netcdf(output_path)
 
-        self.denoised_path = output_path
+        self.preprocessed_path = output_path
+        return output_path
+
+
+class EnvisatASARSource(SARSource):
+    """"""
+    def __init__(self, data_path: Path):
+        self.data_path = data_path
+        self._nansat = Nansat(str(self.data_path))
+
+        self.preprocessed_path = None
+        self._bounding_box = None
+        self._start_time = None
+        self._end_time = None
+        self._properties = None
+
+    @property
+    def identifier(self):
+        """"""
+        return self.data_path.stem
+
+    @property
+    def bounding_box(self):
+        """"""
+        if self._bounding_box is None:
+            corners_lons, corners_lats = self._nansat.get_corners()
+            min_lon = 180.
+            max_lon = -180.
+            min_lat = 90.
+            max_lat = -90.
+            for lon in corners_lons:
+                if lon < min_lon:
+                    min_lon = lon
+                if lon > max_lon:
+                    max_lon = lon
+            for lat in corners_lats:
+                if lat < min_lat:
+                    min_lat = lat
+                if lat > max_lat:
+                    max_lat = lat
+            self._bounding_box = Extent(min_lon, max_lon, min_lat, max_lat)
+        return self._bounding_box
+
+    @property
+    def start_time(self):
+        """"""
+        return dateutil.parser.parse(self.properties['time_coverage_start'])
+
+    @property
+    def end_time(self):
+        """"""
+        return dateutil.parser.parse(self.properties['time_coverage_end'])
+
+    @property
+    def properties(self):
+        """"""
+        return self._nansat.get_metadata()
+
+    def preprocess(self, out_dir, polarizations=('VV',)):
+        """"""
+        output_path = out_dir / f'preprocessed_{self.identifier}.nc'
+        logger.info("Preprocessing %s (%s)",
+                    self.identifier, ','.join(polarizations))
+
+        if output_path.exists():
+            logger.info("Preprocessed file already exists: %s", output_path)
+        else:
+            logger.info(f'Writing preprocessed dataset at {output_path}...')
+
+            self._nansat.resize(pixelsize=500, resample_alg=0)
+            lon_grd, lats_grd = self._nansat.get_geolocation_grids()
+            watermask = self._nansat.watermask()
+
+            s1_dataset = xr.Dataset(
+                data_vars={
+                    "sigma0": (('row', 'col'), self._nansat['sigma0_VV'], {'polarization': 'VV', '_FillValue': -999.}),
+                    "watermask": (('row', 'col'), watermask[1], {'source': 'MOD44W', '_FillValue': -999.}),
+                    "incidence": (('row', 'col'), self._nansat['incidence_angle']),
+                    "look_direction": (('row', 'col'), self._nansat['look_direction'], {'_FillValue': -999.}),
+                },
+                coords={
+                    "lon": (('row', 'col'), lon_grd),
+                    "lat": (('row', 'col'), lats_grd)
+                }
+            )
+            s1_dataset.to_netcdf(output_path)
+
+        self.preprocessed_path = output_path
         return output_path

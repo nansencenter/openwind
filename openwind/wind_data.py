@@ -195,7 +195,7 @@ class ERA5Source():
 
     def interpolate_on_sar_grid(self, out_dir: Path):
         """"""
-        denoised_s1_file = self.sar_source.denoised_path
+        denoised_s1_file = self.sar_source.preprocessed_path
         out_file = out_dir / f'interp_{self.data_path.name}'
         logger.info("Interpolating %s on the grid of %s. Writing to %s",
                     self.data_path.name, denoised_s1_file, out_file)
