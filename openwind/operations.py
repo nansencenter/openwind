@@ -248,9 +248,9 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
 
 
 def generate_product(
-        extent: utils.Extent,
-        time_start: datetime,
-        time_end: datetime,
+        extent: utils.Extent = None,
+        time_start: datetime = None,
+        time_end: datetime = None,
         s1_identifiers: Sequence[str] = None,
         sar_files: Sequence[Union[str, Path]] = None,
         sar_source_class: Union[type[sar_data.Sentinel1Source],
@@ -273,6 +273,12 @@ def generate_product(
     denoised_dir = denoised_dir or (workdir / 'denoised')
     wind_folder = wind_folder or (workdir / 'wind')
     plot_dir = plot_dir or (workdir / 'plots')
+
+    if sar_files is None:
+        for param in (extent, time_start, time_end):
+            if param is None:
+                raise ValueError(
+                    "Either sar_files or (extent, time_start, time_end) need to be provided")
 
     for folder in (input_dir, output_dir, denoised_dir, wind_folder, plot_dir):
         logger.debug("Making sure directory exists: %s", folder)
