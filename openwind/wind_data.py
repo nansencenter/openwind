@@ -12,15 +12,19 @@
 # License:
 # -------------------------------------------------------------------------------
 import logging
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Union, Optional, Tuple
 
+import asf_search as asf
 import cdsapi
 import numpy as np
+import shapely.geometry
 import xarray as xr
 from nansat import Nansat
 from numpy.typing import NDArray
+from osgeo import gdal
 
 from .sar_data import Sentinel1Source
 
@@ -149,6 +153,15 @@ class ERA5Source():
         self.product = None
         self.data_path = data_path
         self.interpolated_path = None
+        self._time = None
+
+    def get_time(self):
+        """"""
+        if self._time is None:
+            self._time = datetime.fromisoformat(
+            xr.open_dataset(self.data_path, decode_coords='all').variables['valid_time']
+            .data[0].astype(str))
+        return self._time
 
     def find_product(self, bbox_expansion: float = .1) -> cdsapi.api.Result:
         """"""
@@ -230,5 +243,157 @@ class ERA5Source():
                 }
             )
             interp_era5.to_netcdf(out_file)
+        self.interpolated_path = out_file
+        return out_file
+
+
+class Sentinel1OCNSource():
+    """Wind model data source using ECMWF from Sentinel-1 OCN datasets
+    """
+    model_name = 'ECMWF'
+
+    def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
+        """"""
+        self.sar_source = sar_source
+        self.product = None
+        self.data_path = data_path
+        self.interpolated_path = None
+
+    def find_product(self, bbox_expansion: float = .1):
+        """"""
+        s1_shape = self.sar_source.get_shape()
+
+        query = {
+            'platform': asf.PLATFORM.SENTINEL1,
+            'start': self.sar_source.start_time,
+            'end': self.sar_source.end_time,
+            'beamMode': asf.BEAMMODE.IW,
+            'processingLevel': asf.PRODUCT_TYPE.OCN,
+            'intersectsWith': s1_shape.wkt,
+        }
+        query_set = asf.search(**query)
+
+        result = None
+        for product in query_set:
+            product_shape = shapely.geometry.shape(product.geometry)
+            intersection = s1_shape.intersection(product_shape)
+            if intersection.area / s1_shape.area >= .9:
+                result = product
+                break
+
+        if result is None:
+            raise RuntimeError(f"No S1 OCN found matching {self.sar_source.identifier}")
+
+        self.product = result
+        return self.product
+
+    #TODO: this is copy-pasted from Sentinel1Source. needs refactoring
+    @property
+    def identifier(self):
+        """"""
+        if self.product:
+            return self.product.properties['sceneName']
+        elif self.data_path:
+            return self.data_path.stem
+        elif self.preprocessed_path:
+            return self.preprocessed_path.stem
+
+    @property
+    def properties(self):
+        """"""
+        return self.product.properties
+
+    def get_time(self):
+        """"""
+        return datetime.fromisoformat(self.properties['startTime'])
+
+    def download(self, out_dir: Union[str, Path]):
+        """"""
+        if self.product is None:
+            self.find_product()
+        target = Path(out_dir, self.product.properties['fileName'])
+        logger.info("Downloading to %s", target)
+        if not target.exists():
+            self.product.download(str(out_dir))
+        else:
+            logger.info("Did not download, destination already exists: %s", target)
+        self.data_path = target
+        self.unzip(out_dir)
+        return target
+
+    def unzip(self, out_dir):
+        """"""
+        safe_name = f"{self.identifier}.SAFE/"
+        safe_path = Path(out_dir, safe_name)
+        if not safe_path.exists() and zipfile.is_zipfile(self.data_path):
+            logger.info("Unzipping %s", self.data_path)
+            with zipfile.ZipFile(self.data_path) as zip_file:
+                if safe_name in zip_file.namelist():
+                    zip_file.extractall(out_dir)
+                else:
+                    raise RuntimeError(f"Not a Sentinel-1 SAFE archive: {self.data_path}")
+        else:
+            logger.info("Already unzipped: %s", self.data_path)
+        self.data_path = list((safe_path / 'measurement').glob('s1*.nc'))[0]
+        return self.data_path
+
+    def geolocate_variable(self, file_path, variable_name):
+        """"""
+        s1_ocn_dataset = xr.open_dataset(file_path, decode_coords='all')
+        lines, pixels = s1_ocn_dataset.sizes['owiAzSize'], s1_ocn_dataset.sizes['owiRaSize']
+        gcps_line_spacing = lines // 20
+        gcps_pixel_spacing = pixels // 20
+        # get gcps, including the 4 corners
+        gcps = [
+            gdal.GCP(float(s1_ocn_dataset['owiLon'][i, j]), float(s1_ocn_dataset['owiLat'][i, j]), 0., j, i)
+            for i in [*range(0, lines, gcps_line_spacing), lines - 1]
+            for j in [*range(0, pixels, gcps_pixel_spacing), pixels - 1]
+        ]
+        translated_dir = f'/vsimem/{file_path.stem}_{variable_name}.tiff'
+        warped_dir = file_path.parent / f'warped_{file_path.stem}_{variable_name}.nc'
+        gdal.Translate(
+            str(translated_dir),
+            f"NETCDF:{file_path}:{variable_name}",
+            GCPs=gcps,
+            outputSRS='epsg:4326')
+        gdal.Warp(
+            str(warped_dir),
+            str(translated_dir),
+            dstSRS='epsg:4326')
+        return warped_dir
+
+    def interpolate_on_sar_grid(self, out_dir: Path):
+        """"""
+        denoised_s1_file = self.sar_source.preprocessed_path
+        out_file = out_dir / f'interp_{self.data_path.stem}.nc'
+        logger.info("Interpolating %s on the grid of %s. Writing to %s",
+                    self.data_path.name, denoised_s1_file, out_file)
+
+        if out_file.exists():
+            logger.info("Interpolated file already exists at %s, skipping", out_file)
+        else:
+            s1_dataset = xr.open_dataset(denoised_s1_file, decode_coords='all')
+
+            interp_dir = xr.open_dataset(
+                self.geolocate_variable(self.data_path, 'owiEcmwfWindDirection'),
+                decode_coords='all'
+            ).interp(lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+
+            interp_speed = xr.open_dataset(
+                self.geolocate_variable(self.data_path, 'owiEcmwfWindSpeed'),
+                decode_coords='all'
+            ).interp(lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+
+            interp_dataset = xr.Dataset(
+                data_vars={
+                    "speed": (('row', 'col'), interp_speed['Band1'].data),
+                    "dir": (('row', 'col'), interp_dir['Band1'].data),
+                },
+                coords={
+                    'lon': s1_dataset.coords['lon'],
+                    'lat': s1_dataset.coords['lat'],
+                }
+            )
+            interp_dataset.to_netcdf(out_file)
         self.interpolated_path = out_file
         return out_file
