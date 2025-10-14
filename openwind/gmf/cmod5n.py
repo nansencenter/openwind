@@ -1,6 +1,6 @@
 import warnings
 # Ignore overflow errors for wind calculations over land
-warnings.simplefilter("ignore", RuntimeWarning) 
+warnings.simplefilter("ignore", RuntimeWarning)
 
 def cmod5n_forward(v,phi,theta):
     '''!     ---------
@@ -23,17 +23,17 @@ def cmod5n_forward(v,phi,theta):
     !     K.F.Dagestad              OCT 2011 NERSC,  Vectorized Python version
     !---------------------------------------------------------------------
        '''
-        
+
     from numpy import cos, exp, tanh, array
-    
+
     DTOR   = 57.29577951
     THETM  = 40.
     THETHR = 25.
     ZPOW   = 1.6
-    
+
     # NB: 0 added as first element below, to avoid switching from 1-indexing to 0-indexing
-    C = [0, -0.6878, -0.7957,  0.3380, -0.1728, 0.0000,  0.0040, 0.1103, 0.0159, 
-          6.7329,  2.7713, -2.2885, 0.4971, -0.7250, 0.0450, 
+    C = [0, -0.6878, -0.7957,  0.3380, -0.1728, 0.0000,  0.0040, 0.1103, 0.0159,
+          6.7329,  2.7713, -2.2885, 0.4971, -0.7250, 0.0450,
           0.0066,  0.3222,  0.0120, 22.7000, 2.0813,  3.0000, 8.3659,
           -3.3428,  1.3236,  6.2437,  2.3893, 0.3249,  4.1590, 1.6930]
     Y0 = C[19]
@@ -61,7 +61,7 @@ def cmod5n_forward(v,phi,theta):
     # V is missing! Using V=v as substitute, this is apparently correct
     V=v
     S = A2*V
-    S_vec = S.copy() 
+    S_vec = S.copy()
     # Artem Moiseev (NERSC) 7 Mar 2024: Fixed with removal of the list wrapping
     # Following lines from original code raise IndexError: too many indices for array: array is 2-dimensional, but 3 were indexed
     # when executed on python 3.11
@@ -76,13 +76,13 @@ def cmod5n_forward(v,phi,theta):
     # This must be related to the way boolean index array is defined with a list wrapping
     SlS0 = S_vec < S0
     S_vec[SlS0] = S0[SlS0]
-    
+
     A3=1./(1.+exp(-S_vec))
     SlS0 = (S<S0)
     A3[SlS0]=A3[SlS0]*(S[SlS0]/S0[SlS0])**( S0[SlS0]*(1.- A3[SlS0]))
     #A3=A3*(S/S0)**( S0*(1.- A3))
     B0=(A3**GAM)*10.**(A0+A1*V)
-        
+
     #  !  B1: FUNCTION OF WIND SPEED AND INCIDENCE ANGLE
     B1 = C[15]*V*(0.5+X-tanh(4.*(X+C[16]+C[17]*V)))
     B1 = C[14]*(1.+X)- B1
@@ -101,7 +101,7 @@ def cmod5n_forward(v,phi,theta):
     #  !  CMOD5_N: COMBINE THE THREE FOURIER TERMS
     CMOD5_N = B0*(1.0+B1*CSFI+B2*CS2FI)**ZPOW
     return CMOD5_N
-    
+
 
 def cmod5n_inverse(sigma0_obs, phi, incidence, iterations=10):
     '''!     ---------
@@ -113,32 +113,30 @@ def cmod5n_inverse(sigma0_obs, phi, incidence, iterations=10):
     !              incidence in [deg] incidence angle
     !              iterations: number of iterations to run
     !         output:
-    !              Wind speed, 10 m, neutral stratification 
+    !              Wind speed, 10 m, neutral stratification
     !
     !        All inputs must be Numpy arrays of equal sizes
     !
     !    This function iterates the forward CMOD5N function
-    !    until agreement with input (observed) sigma0 values   
+    !    until agreement with input (observed) sigma0 values
     !---------------------------------------------------------------------
        '''
     from numpy import ones, array
-    
+
     # First guess wind speed
     V = array([10.])*ones(sigma0_obs.shape)
     step=5
-    
+
     # Iterating until error is smaller than threshold
     for iterno in range(1, iterations):
-        print(iterno)
-        #print iterno
         sigma0_calc = cmod5n_forward(V, phi, incidence)
         ind = sigma0_calc-sigma0_obs>0
         V = V + step
-        V[ind] = V[ind] - 2*step 
+        V[ind] = V[ind] - 2*step
         step = step/2
 
     #mdict={'s0obs':sigma0_obs,'s0calc':sigma0_calc}
     #from scipy.io import savemat
     #savemat('s0test',mdict)
-        
+
     return V
