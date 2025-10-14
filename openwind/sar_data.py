@@ -10,6 +10,7 @@ import asf_search as asf
 import dateutil.parser
 import numpy as np
 import pythesint as pti
+import shapely.geometry
 import xarray as xr
 from nansat import Nansat
 from numpy.typing import NDArray
@@ -257,11 +258,13 @@ class Sentinel1Source(SARSource):
             f"{extent.west} {extent.north},"
             f"{extent.west} {extent.south}))")
 
+        date_format = '%Y-%m-%dT%H:%M:%SZ'
+
         if query is None:
             query = {
                 'platform': asf.PLATFORM.SENTINEL1,
-                'start': time_start,
-                'end': time_end,
+                'start': time_start.strftime(date_format),
+                'end': time_end.strftime(date_format),
                 'beamMode': asf.BEAMMODE.IW,
                 'processingLevel': asf.PRODUCT_TYPE.GRD_HD,
                 'intersectsWith': polygon,
@@ -311,6 +314,10 @@ class Sentinel1Source(SARSource):
             self._bounding_box = Extent(min_lon, max_lon, min_lat, max_lat)
         return self._bounding_box
 
+    def get_shape(self):
+        """Get the coverage of the dataset as a shapely shape"""
+        return shapely.geometry.shape(self._asf_product.geometry)
+
     @property
     def start_time(self):
         """"""
@@ -352,11 +359,11 @@ class Sentinel1Source(SARSource):
             with zipfile.ZipFile(self.data_path) as zip_file:
                 if safe_name in zip_file.namelist():
                     zip_file.extractall(out_dir)
-                    self.data_path = safe_path
                 else:
                     raise RuntimeError(f"Not a Sentinel-1 SAFE archive: {self.data_path}")
         else:
             logger.info("Already unzipped: %s", self.data_path)
+        self.data_path = safe_path
         return self.data_path
 
     def _run_s1_correction(self,
