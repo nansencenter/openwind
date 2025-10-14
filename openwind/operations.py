@@ -279,6 +279,10 @@ def generate_product(
             if param is None:
                 raise ValueError(
                     "Either sar_files or (extent, time_start, time_end) need to be provided")
+            else:
+                sar_input_params = f"extent={extent}, time_start={time_start}, time_end={time_end}"
+    else:
+        sar_input_params = f"sar_files={sar_files}"
 
     for folder in (input_dir, output_dir, denoised_dir, wind_folder, plot_dir):
         logger.debug("Making sure directory exists: %s", folder)
@@ -293,13 +297,14 @@ def generate_product(
             }
         )
     elif sar_source_class is not None and sar_files is not None:
-        sar_sources = [sar_source_class(data_path=p) for p in sar_files]
+        sar_sources = [sar_source_class.from_path(data_path=p) for p in sar_files]
     else:
         sar_sources = sar_data.Sentinel1Source.from_asf(extent, time_start, time_end)
     if sar_sources is None:
         raise ValueError("Could not determine the source of SAR data")
     elif not sar_sources:
-        raise RuntimeError("Could not find any SAR sources matching the provided parameters")
+        raise RuntimeError(
+            f"Could not find any SAR sources matching the provided parameters ({sar_input_params})")
 
     for sar_source in sar_sources:
         logger.info("Processing %s", sar_source.identifier)
@@ -327,4 +332,4 @@ def generate_product(
         if plot:
             plot_full_dataset(sar_source, wind_source, full_dataset_path, plot_dir)
 
-    logger.info('Done processing sar sources from %s', input_dir)
+    logger.info('Done processing sar sources matching %s', sar_input_params)
