@@ -287,12 +287,7 @@ class Sentinel1Source(SARSource):
     @property
     def identifier(self):
         """"""
-        if self._asf_product:
-            return self._asf_product.properties['sceneName']
-        elif self.data_path:
-            return self.data_path.stem
-        elif self.preprocessed_path:
-            return self.preprocessed_path.stem
+        return self.properties['sceneName']
 
     @property
     def bounding_box(self):
@@ -322,14 +317,14 @@ class Sentinel1Source(SARSource):
     def start_time(self):
         """"""
         if self._start_time is None:
-            self._start_time = dateutil.parser.parse(self._asf_product.properties['startTime'])
+            self._start_time = dateutil.parser.parse(self.properties['startTime'])
         return self._start_time
 
     @property
     def end_time(self):
         """"""
         if self._end_time is None:
-            self._end_time = dateutil.parser.parse(self._asf_product.properties['stopTime'])
+            self._end_time = dateutil.parser.parse(self.properties['stopTime'])
         return self._end_time
 
     @property
@@ -339,16 +334,17 @@ class Sentinel1Source(SARSource):
 
     def download(self, out_dir, unzip=False):
         """"""
-        target = Path(out_dir, self._asf_product.properties['fileName'])
-        logger.info("Downloading to %s", target)
-        if not target.exists():
-            self._asf_product.download(str(out_dir))
-        else:
-            logger.info("Did not download, destination already exists: %s", target)
-        self.data_path = target
+        if self.data_path is None:
+            target = Path(out_dir, self.properties['fileName'])
+            logger.info("Downloading to %s", target)
+            if not target.exists():
+                self._asf_product.download(str(out_dir))
+            else:
+                logger.info("Did not download, destination already exists: %s", target)
+            self.data_path = target
         if unzip:
             self.unzip(out_dir)
-        return target
+        return self.data_path
 
     def unzip(self, out_dir):
         """"""
@@ -453,6 +449,10 @@ class EnvisatASARSource(SARSource):
         self._start_time = None
         self._end_time = None
         self._properties = None
+
+    @classmethod
+    def from_path(cls, data_path: Union[str, Path] = None):
+        return cls(data_path)
 
     @property
     def identifier(self):
