@@ -159,13 +159,15 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
     else:
         full_dataset = xr.open_dataset(full_ds_path, decode_coords='all')
 
-        sigma0_variables = set()
-        computed_variables = set()
+        sigma0_variables = []
+        computed_variables = []
         for variable in full_dataset.variables:
             if variable.startswith('sigma0'):
-                sigma0_variables.add(variable)
+                sigma0_variables.append(variable)
             elif variable.startswith('computed_'):
-                computed_variables.add(variable)
+                computed_variables.append(variable)
+        sigma0_variables.sort()
+        computed_variables.sort()
         base_variables = set(('u10', 'v10', 'model_wind_dir', 'model_wind_speed'))
 
         # normalize s1
