@@ -74,8 +74,9 @@ def make_metadata(sar_source:sar_data.SARSource, wind_time, wind_model='ERA5', g
 
 
 def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA5Source,
-                      out_dir: Path, gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n'):
-    """enerate the full dataset, which includes:
+                      out_dir: Path,
+                      gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n', iterations: int = 10):
+    """Generate the full dataset, which includes:
         - the original SAR data (sigma0, incidence angle, watermask)
         - the denoised SAR data (sigma0) if applicable
         - the original wind model data (speed+direction or u+v)
@@ -105,6 +106,7 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
                     s1_dataset[var_name].to_numpy(),
                     wind_dir,
                     s1_dataset['incidence'].to_numpy(),
+                    iterations=iterations
                 )
                 computed_u, computed_v = u_v_from_dir_speed(wind_dir, wind_speed)
                 final_vars[var_name] = s1_dataset[var_name]
@@ -249,47 +251,37 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
     return out_file
 
 
-def generate_product(
+def check_sar_input(
+        extent: utils.Extent = None,
+        time_start: datetime = None,
+        time_end: datetime = None,
+        s1_identifiers: Sequence[str] = None,
+        sar_files: Sequence[Union[str, Path]] = None):
+    """Check that input parameters give enough information to look for
+    SAR sources
+    """
+    if sar_files is None and s1_identifiers is None:
+        for param in (extent, time_start, time_end):
+            if param is None:
+                raise ValueError(
+                    "Either sar_files, s1_identifiers or (extent, time_start, time_end) "
+                    "need to be provided")
+            else:
+                sar_input_params = f"extent={extent}, time_start={time_start}, time_end={time_end}"
+    else:
+        sar_input_params = f"sar_files={sar_files}"
+    return sar_input_params
+
+
+def create_sar_sources(
         extent: utils.Extent = None,
         time_start: datetime = None,
         time_end: datetime = None,
         s1_identifiers: Sequence[str] = None,
         sar_files: Sequence[Union[str, Path]] = None,
         sar_source_class: Union[type[sar_data.Sentinel1Source],
-                                type[sar_data.EnvisatASARSource]] = sar_data.Sentinel1Source,
-
-        wind_source_class: Union[type[wind_data.ERA5Source],
-                                 type[wind_data.Sentinel1OCNSource]] = wind_data.ERA5Source,
-        gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n',
-        plot: bool = False,
-        workdir: Union[str, Path] = Path('.'),
-        input_dir: Union[str, Path] = None,
-        output_dir: Union[str, Path] = None,
-        denoised_dir: Union[str, Path] = None,
-        wind_folder: Union[str, Path] = None,
-        plot_dir: Union[str, Path] = None):
-    """Generate a full data product for the specified time and space extents"""
-    workdir = Path(workdir)
-    input_dir = input_dir or (workdir / 'input')
-    output_dir = output_dir or (workdir / 'output')
-    denoised_dir = denoised_dir or (workdir / 'denoised')
-    wind_folder = wind_folder or (workdir / 'wind')
-    plot_dir = plot_dir or (workdir / 'plots')
-
-    if sar_files is None:
-        for param in (extent, time_start, time_end):
-            if param is None:
-                raise ValueError(
-                    "Either sar_files or (extent, time_start, time_end) need to be provided")
-            else:
-                sar_input_params = f"extent={extent}, time_start={time_start}, time_end={time_end}"
-    else:
-        sar_input_params = f"sar_files={sar_files}"
-
-    for folder in (input_dir, output_dir, denoised_dir, wind_folder, plot_dir):
-        logger.debug("Making sure directory exists: %s", folder)
-        folder.mkdir(parents=True, exist_ok=True)
-
+                                type[sar_data.EnvisatASARSource]] = sar_data.Sentinel1Source):
+    """Create SAR sources from input parameters"""
     sar_sources = None
     if s1_identifiers:
         sar_sources = sar_data.Sentinel1Source.from_asf(
@@ -307,6 +299,47 @@ def generate_product(
     elif not sar_sources:
         raise RuntimeError(
             f"Could not find any SAR sources matching the provided parameters ({sar_input_params})")
+    return sar_sources
+
+
+def generate_product(
+        extent: utils.Extent = None,
+        time_start: datetime = None,
+        time_end: datetime = None,
+        s1_identifiers: Sequence[str] = None,
+        sar_files: Sequence[Union[str, Path]] = None,
+        sar_source_class: Union[type[sar_data.Sentinel1Source],
+                                type[sar_data.EnvisatASARSource]] = sar_data.Sentinel1Source,
+
+        wind_source_class: Union[type[wind_data.ERA5Source],
+                                 type[wind_data.Sentinel1OCNSource]] = wind_data.ERA5Source,
+        gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n',
+        iterations: int = 10,
+        plot: bool = False,
+        workdir: Union[str, Path] = Path('.'),
+        input_dir: Union[str, Path] = None,
+        output_dir: Union[str, Path] = None,
+        denoised_dir: Union[str, Path] = None,
+        wind_folder: Union[str, Path] = None,
+        plot_dir: Union[str, Path] = None):
+    """Generate a full data product for the specified time and space extents"""
+    sar_input_params = check_sar_input(extent, time_start, time_end, s1_identifiers, sar_files)
+
+    # Make sure necessary directories exist
+    workdir = Path(workdir)
+    input_dir = input_dir or (workdir / 'input')
+    output_dir = output_dir or (workdir / 'output')
+    denoised_dir = denoised_dir or (workdir / 'denoised')
+    wind_folder = wind_folder or (workdir / 'wind')
+    plot_dir = plot_dir or (workdir / 'plots')
+    for folder in (input_dir, output_dir, denoised_dir, wind_folder, plot_dir):
+        logger.debug("Making sure directory exists: %s", folder)
+        folder.mkdir(parents=True, exist_ok=True)
+
+    sar_sources = create_sar_sources(
+        extent, time_start, time_end,
+        s1_identifiers,
+        sar_files, sar_source_class)
 
     for sar_source in sar_sources:
         logger.info("Processing %s", sar_source.identifier)
@@ -328,7 +361,8 @@ def generate_product(
         wind_source.interpolate_on_sar_grid(wind_folder)
 
         # create the full dataset
-        full_dataset_path = make_full_dataset(sar_source, wind_source, output_dir, gmf)
+        full_dataset_path = make_full_dataset(
+            sar_source, wind_source, output_dir, gmf, iterations=iterations)
 
         # plot the full dataset
         if plot:
