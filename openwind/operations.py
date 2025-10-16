@@ -98,7 +98,7 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
         s1_dataset = xr.open_dataset(sar_source.preprocessed_path, decode_coords='all')
         interp_wind_dataset = xr.open_dataset(wind_source.interpolated_path, decode_coords='all')
 
-        wind_dir = interp_wind_dataset['dir'].to_numpy()
+        wind_dir = interp_wind_dataset['dir'].to_masked_array(copy=False)
 
         if gmf == 'cmod5.n':
             gmf_inverse = cmod5n.cmod5n_inverse
@@ -108,8 +108,10 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
         final_vars = {}
         for var_name in s1_dataset.variables:
             if var_name.startswith('sigma0'):
+                sar = s1_dataset[var_name].to_numpy()
+                sar[~wind_dir.mask] = np.nan
                 wind_speed = gmf_inverse(
-                    s1_dataset[var_name].to_numpy(),
+                    sar,
                     wind_dir,
                     s1_dataset['incidence'].to_numpy(),
                     iterations=iterations
@@ -393,7 +395,7 @@ def stop_processes(processes: dict, timeout: int = 1800):
     """Stop processes listenting to a queue"""
     # for each set of workers, send a message to stop and wait for them
     # to be finished before stopping the next workers
-    for process_config in processes.values:
+    for process_config in processes.values():
         # send stop messages in the input queue
         for _ in range(process_config['workers']):
             process_config['input_queue'].put(Done)
