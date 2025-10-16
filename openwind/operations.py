@@ -1,8 +1,10 @@
 import logging
+import multiprocessing
 from collections.abc import Sequence
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Union, Literal
+from typing import Union, Literal, Generator
 
 import asf_search
 import asf_search.constants.INTERNAL
@@ -26,6 +28,10 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 asf_search.constants.INTERNAL.CMR_TIMEOUT = 60
+
+
+class Done:
+    """Put in a Queue to signal the end of processing"""
 
 
 def make_metadata(sar_source:sar_data.SARSource, wind_time, wind_model='ERA5', gmf='cmod5.n'):
@@ -280,7 +286,8 @@ def create_sar_sources(
         s1_identifiers: Sequence[str] = None,
         sar_files: Sequence[Union[str, Path]] = None,
         sar_source_class: Union[type[sar_data.Sentinel1Source],
-                                type[sar_data.EnvisatASARSource]] = sar_data.Sentinel1Source):
+                                type[sar_data.EnvisatASARSource]] = sar_data.Sentinel1Source,
+        sar_input_params: str = None) -> Generator:
     """Create SAR sources from input parameters"""
     sar_sources = None
     if s1_identifiers:
@@ -291,7 +298,7 @@ def create_sar_sources(
             }
         )
     elif sar_source_class is not None and sar_files is not None:
-        sar_sources = [sar_source_class.from_path(data_path=p) for p in sar_files]
+        sar_sources = (sar_source_class.from_path(data_path=p) for p in sar_files)
     else:
         sar_sources = sar_data.Sentinel1Source.from_asf(extent, time_start, time_end)
     if sar_sources is None:
@@ -300,6 +307,99 @@ def create_sar_sources(
         raise RuntimeError(
             f"Could not find any SAR sources matching the provided parameters ({sar_input_params})")
     return sar_sources
+
+
+def thread_download(
+        downloaded_queue: multiprocessing.Queue,
+        sar_source: sar_data.SARSource,
+        wind_source: Union[wind_data.ERA5Source, wind_data.Sentinel1OCNSource],
+        input_dir: Path,
+        wind_folder: Path,):
+    """Downloads SAR and wind. Meant to be run in a thread.
+    """
+    sar_source.download(input_dir, unzip=True)
+    try:
+        wind_source.download(wind_folder)
+    except RuntimeError:
+        logger.warning("No wind data found matching %s", sar_source.identifier)
+        return None
+    downloaded_queue.put((sar_source, wind_source))
+
+
+def process_preprocess(
+        downloaded_queue: multiprocessing.Queue,
+        preprocessed_queue: multiprocessing.Queue,
+        denoised_dir: Path,
+        polarizations: tuple[str],
+        wind_folder: Path):
+    """Preprocess SAR (denoise, resize) and wind data (interpolate),
+    then generate the full dataset.
+    Meant to be run in a separate process
+    """
+    try:
+        while True:
+            next_item = downloaded_queue.get()
+            if next_item is Done:
+                break
+            sar_source, wind_source = next_item
+            sar_source.preprocess(denoised_dir, polarizations=polarizations)
+            wind_source.interpolate_on_sar_grid(wind_folder)
+            preprocessed_queue.put((sar_source, wind_source))
+    except Exception:
+        logger.error("Error during preprocessing", exc_info=True)
+        raise
+
+
+def process_make_dataset(
+        preprocessed_queue: multiprocessing.Queue,
+        processed_queue: multiprocessing.Queue,
+        output_dir: Path,
+        gmf: str,
+        iterations: int):
+    """Create the full dataset. Meant to be run in a separate process
+    """
+    try:
+        while True:
+            next_item = preprocessed_queue.get()
+            if next_item is Done:
+                break
+            sar_source, wind_source = next_item
+            full_dataset_path = make_full_dataset(
+                sar_source, wind_source, output_dir, gmf, iterations=iterations)
+            processed_queue.put((sar_source, wind_source, full_dataset_path))
+    except Exception:
+        logger.error("Error during dataset creation", exc_info=True)
+        raise
+
+
+def process_plot_dataset(
+        processed_queue: multiprocessing.Queue,
+        plot_dir: Path):
+    """Plot the full dataset. Meant to be run in a separate process
+    """
+    try:
+        while True:
+            next_item = processed_queue.get()
+            if next_item is Done:
+                break
+            sar_source, wind_source, full_dataset_path = next_item
+            plot_full_dataset(sar_source, wind_source, full_dataset_path, plot_dir)
+    except Exception:
+        logger.error("Error during plotting", exc_info=True)
+        raise
+
+
+def stop_processes(processes: dict, timeout: int = 1800):
+    """Stop processes listenting to a queue"""
+    # for each set of workers, send a message to stop and wait for them
+    # to be finished before stopping the next workers
+    for process_config in processes.values:
+        # send stop messages in the input queue
+        for _ in range(process_config['workers']):
+            process_config['input_queue'].put(Done)
+        # wait for the processes to stop
+        for p in process_config['processes']:
+            p.join(timeout)
 
 
 def generate_product(
@@ -321,7 +421,11 @@ def generate_product(
         output_dir: Union[str, Path] = None,
         denoised_dir: Union[str, Path] = None,
         wind_folder: Union[str, Path] = None,
-        plot_dir: Union[str, Path] = None):
+        plot_dir: Union[str, Path] = None,
+        max_download_workers: int = 10,
+        max_preprocess_workers: int = 5,
+        max_process_workers: int = 10,
+        max_plot_workers: int = 5):
     """Generate a full data product for the specified time and space extents"""
     sar_input_params = check_sar_input(extent, time_start, time_end, s1_identifiers, sar_files)
 
@@ -341,31 +445,67 @@ def generate_product(
         s1_identifiers,
         sar_files, sar_source_class)
 
-    for sar_source in sar_sources:
-        logger.info("Processing %s", sar_source.identifier)
 
-        # download SAR data
-        sar_source.download(input_dir, unzip=True)
-        # denoise and/or resize SAR data to a 500m grid
-        sar_source.preprocess(denoised_dir, polarizations=('VV',))
+    downloaded_queue = multiprocessing.Queue()
+    preprocessed_queue = multiprocessing.Queue()
+    processed_queue = multiprocessing.Queue()
 
-        # download wind data
-        wind_source = wind_source_class(sar_source)
+    processes = {
+        'preprocess': {
+            'input_queue': downloaded_queue,
+            'workers': max_preprocess_workers,
+            'function': process_preprocess,
+            'args': (downloaded_queue, preprocessed_queue, denoised_dir, ('VV',), wind_folder),
+            'processes': [],
+        },
+        'process': {
+            'input_queue': preprocessed_queue,
+            'workers': max_process_workers,
+            'function': process_make_dataset,
+            'args': (preprocessed_queue, processed_queue, output_dir, gmf, iterations),
+            'processes': [],
+        },
+        'plot': {
+            'input_queue': processed_queue,
+            'workers': max_plot_workers,
+            'function': process_plot_dataset,
+            'args': (processed_queue, plot_dir),
+            'processes': [],
+        }
+    }
+
+    with ThreadPoolExecutor(max_workers=max_download_workers) as download_executor:
+        download_futures = []
+
         try:
-            wind_source.download(wind_folder)
-        except RuntimeError:
-            logger.warning("No wind data found matching %s", sar_source.identifier)
-            continue
+            # start worker processes
+            for process_config in processes.values():
+                p = multiprocessing.Process(
+                        target=process_config['function'],
+                        args=process_config['args'])
+                process_config['processes'].append(p)
+                p.start()
 
-        # interpolate wind data on the SAR grid
-        wind_source.interpolate_on_sar_grid(wind_folder)
+            # download SAR and wind, starting the processing chain
+            for sar_source in sar_sources:
+                wind_source = wind_source_class(sar_source)
+                download_futures.append(download_executor.submit(
+                    thread_download,
+                    downloaded_queue,
+                    sar_source, wind_source, input_dir, wind_folder))
 
-        # create the full dataset
-        full_dataset_path = make_full_dataset(
-            sar_source, wind_source, output_dir, gmf, iterations=iterations)
+            for download_future in as_completed(download_futures):
+                try:
+                    download_future.result()
+                except Exception:
+                    logger.error("Error during download", exc_info=True)
 
-        # plot the full dataset
-        if plot:
-            plot_full_dataset(sar_source, wind_source, full_dataset_path, plot_dir)
+            # stop worker processes
+            stop_processes(processes)
+
+        except KeyboardInterrupt:
+            for download_future in download_futures:
+                download_future.cancel()
+            stop_processes(processes)
 
     logger.info('Done processing sar sources matching %s', sar_input_params)
