@@ -270,7 +270,8 @@ class Sentinel1Source(SARSource):
                 'intersectsWith': polygon,
             }
         query_set = asf.search(**query)
-        return [cls(asf_product=asf_product) for asf_product in query_set]
+        for asf_product in query_set:
+            yield cls(asf_product=asf_product)
 
     @classmethod
     def from_path(cls, data_path: Union[str, Path] = None):
