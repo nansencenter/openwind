@@ -356,7 +356,7 @@ class Sentinel1Source(SARSource):
             self.unzip(out_dir)
         return self.data_path
 
-    def unzip(self, out_dir):
+    def unzip(self, out_dir, remove_zip=True):
         """"""
         safe_name = f"{self.identifier}.SAFE/"
         safe_path = Path(out_dir, safe_name)
@@ -367,6 +367,8 @@ class Sentinel1Source(SARSource):
                     zip_file.extractall(out_dir)
                 else:
                     raise RuntimeError(f"Not a Sentinel-1 SAFE archive: {self.data_path}")
+            if remove_zip:
+                self.data_path.unlink()
         else:
             logger.info("Already unzipped: %s", self.data_path)
         self.data_path = safe_path
