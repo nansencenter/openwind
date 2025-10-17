@@ -338,18 +338,19 @@ def process_preprocess(
     then generate the full dataset.
     Meant to be run in a separate process
     """
-    try:
-        while True:
-            next_item = downloaded_queue.get()
-            if next_item is Done:
-                break
-            sar_source, wind_source = next_item
+    logger.debug("Starting preprocessing process")
+    while True:
+        next_item = downloaded_queue.get()
+        if next_item is Done:
+            logger.debug("Stopping preprocessing process")
+            break
+        sar_source, wind_source = next_item
+        try:
             sar_source.preprocess(denoised_dir, polarizations=polarizations)
             wind_source.interpolate_on_sar_grid(wind_folder)
             preprocessed_queue.put((sar_source, wind_source))
-    except Exception:
-        logger.error("Error during preprocessing", exc_info=True)
-        raise
+        except Exception:
+            logger.error("Error during preprocessing of %s", sar_source.identifier, exc_info=True)
 
 
 def process_make_dataset(
@@ -360,18 +361,20 @@ def process_make_dataset(
         iterations: int):
     """Create the full dataset. Meant to be run in a separate process
     """
-    try:
-        while True:
-            next_item = preprocessed_queue.get()
-            if next_item is Done:
-                break
-            sar_source, wind_source = next_item
+    logger.debug("Starting dataset making process")
+    while True:
+        next_item = preprocessed_queue.get()
+        if next_item is Done:
+            logger.debug("Stopping dataset making process")
+            break
+        sar_source, wind_source = next_item
+        try:
             full_dataset_path = make_full_dataset(
                 sar_source, wind_source, output_dir, gmf, iterations=iterations)
             processed_queue.put((sar_source, wind_source, full_dataset_path))
-    except Exception:
-        logger.error("Error during dataset creation", exc_info=True)
-        raise
+        except Exception:
+            logger.error("Error during dataset creation for %s",
+                         sar_source.identifier, exc_info=True)
 
 
 def process_plot_dataset(
@@ -379,16 +382,17 @@ def process_plot_dataset(
         plot_dir: Path):
     """Plot the full dataset. Meant to be run in a separate process
     """
-    try:
-        while True:
-            next_item = processed_queue.get()
-            if next_item is Done:
-                break
-            sar_source, wind_source, full_dataset_path = next_item
+    logger.debug("Starting plotting process")
+    while True:
+        next_item = processed_queue.get()
+        if next_item is Done:
+            logger.debug("Stopping plotting process")
+            break
+        sar_source, wind_source, full_dataset_path = next_item
+        try:
             plot_full_dataset(sar_source, wind_source, full_dataset_path, plot_dir)
-    except Exception:
-        logger.error("Error during plotting", exc_info=True)
-        raise
+        except Exception:
+            logger.error("Error during plotting of %s", sar_source.identifier, exc_info=True)
 
 
 def stop_processes(processes: dict, timeout: int = 1800):
