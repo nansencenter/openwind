@@ -337,11 +337,20 @@ class Sentinel1Source(SARSource):
         """"""
         if self.data_path is None:
             target = Path(out_dir, self.properties['fileName'])
-            logger.info("Downloading to %s", target)
-            if not target.exists():
-                self._asf_product.download(str(out_dir))
+            files_to_check = [target]
+            if target.suffix == '.zip':
+                files_to_check.append(Path(out_dir, f"{target.stem}.SAFE"))
+            existing_file = None
+            for to_check in files_to_check:
+                if to_check.exists():
+                    existing_file = to_check
+                    break
+            if existing_file:
+                logger.info("Did not download, destination already exists: %s", existing_file)
             else:
-                logger.info("Did not download, destination already exists: %s", target)
+                logger.info("Downloading to %s", target)
+                self._asf_product.download(str(out_dir))
+
             self.data_path = target
         if unzip:
             self.unzip(out_dir)
