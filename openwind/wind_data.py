@@ -12,6 +12,7 @@
 # License:
 # -------------------------------------------------------------------------------
 import logging
+import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -374,18 +375,19 @@ class Sentinel1OCNSource():
         preprocessed SAR data grid
         """
         denoised_s1_file = self.sar_source.preprocessed_path
-        out_file = out_dir / f'interp_{self.data_path.stem}.nc'
-        logger.info("Interpolating %s on the grid of %s. Writing to %s",
-                    self.data_path.name, denoised_s1_file, out_file)
+        uid = re.match(r'^S1.*_([A-Z0-9]{4})$', self.identifier).group(1)
+        out_file = out_dir / f'interp_{self.data_path.stem}_{uid}.nc'
 
         with xr.open_dataset(denoised_s1_file, decode_coords='all') as s1_dataset:
             skip = False
             if out_file.exists():
                 with xr.open_dataset(out_file) as existing_ds:
-                    if existing_ds.dims == s1_dataset.dims:
+                    if existing_ds.sizes == s1_dataset.sizes:
                         skip = True
                         logger.info("Interpolated file already exists at %s, skipping", out_file)
             if not skip:
+                logger.info("Interpolating %s on the grid of %s. Writing to %s",
+                            self.data_path.name, denoised_s1_file, out_file)
                 with xr.open_dataset(
                         self.geolocate_variable(self.data_path, 'owiEcmwfWindDirection'),
                         decode_coords='all') as geolocated_wind_dir, \
