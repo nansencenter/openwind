@@ -9,6 +9,7 @@ from typing import Union, Literal, Generator
 import asf_search
 import asf_search.constants.INTERNAL
 import cartopy.crs as ccrs
+import cartopy.feature.download.__main__
 import matplotlib.pyplot as plt
 import netCDF4
 import numpy as np
@@ -110,7 +111,6 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
             for var_name in s1_dataset.variables:
                 if var_name.startswith('sigma0'):
                     sar = s1_dataset[var_name].to_numpy()
-                    logger.info("Shape(%s): %s. Shape(wind): %s", var_name, sar.shape, wind_dir.shape)
                     # do not generate wind speed where the wind direction
                     # is not available
                     sar[wind_dir.mask] = np.nan
@@ -477,14 +477,17 @@ def generate_product(
             'args': (preprocessed_queue, processed_queue, output_dir, gmf, iterations),
             'processes': [],
         },
-        'plot': {
+    }
+    if plot:
+        processes['plot'] = {
             'input_queue': processed_queue,
             'workers': max_plot_workers,
             'function': process_plot_dataset,
             'args': (processed_queue, plot_dir),
             'processes': [],
         }
-    }
+        # download coastlines
+        cartopy.feature.download.__main__.download_features(['physical'])
 
     with ThreadPoolExecutor(max_workers=max_download_workers) as download_executor:
         download_futures = []
