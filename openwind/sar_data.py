@@ -397,8 +397,7 @@ class Sentinel1Source(SARSource):
                 ).astype(np.float32)
         return denoised
 
-    def preprocess(self, out_dir, algorithm='NERSC', polarizations=('VV',)):
-        """"""
+    def preprocess(self, out_dir, algorithm='NERSC', polarizations=('VV',), pixel_size=500):
         output_path = out_dir / f'denoised_{self.identifier}.nc'
         logger.info("Denoising %s (%s) using %s algorithm",
                     self.identifier, ','.join(polarizations), algorithm)
@@ -418,7 +417,7 @@ class Sentinel1Source(SARSource):
                     'units': 'dB'
                 })
 
-            s1_orig.resize(pixelsize=500, resample_alg=0)
+            s1_orig.resize(pixelsize=pixel_size, resample_alg=0)
             lon_grd, lats_grd = s1_orig.get_geolocation_grids()
             watermask = s1_orig.watermask()
 
@@ -508,7 +507,7 @@ class EnvisatASARSource(SARSource):
         """"""
         return self._nansat.get_metadata()
 
-    def preprocess(self, out_dir, polarizations=('VV',)):
+    def preprocess(self, out_dir, polarizations=('VV',), pixel_size=500):
         """"""
         output_path = out_dir / f'preprocessed_{self.identifier}.nc'
         logger.info("Preprocessing %s (%s)",
@@ -519,7 +518,7 @@ class EnvisatASARSource(SARSource):
         else:
             logger.info(f'Writing preprocessed dataset at {output_path}...')
 
-            self._nansat.resize(pixelsize=500, resample_alg=0)
+            self._nansat.resize(pixelsize=pixel_size, resample_alg=0)
             lon_grd, lats_grd = self._nansat.get_geolocation_grids()
             watermask = self._nansat.watermask()
 
