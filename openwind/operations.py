@@ -482,11 +482,12 @@ def generate_product(
         try:
             # start worker processes
             for process_config in processes.values():
-                p = multiprocessing.Process(
-                        target=process_config['function'],
-                        args=process_config['args'])
-                process_config['processes'].append(p)
-                p.start()
+                for _ in range(process_config['workers']):
+                    p = multiprocessing.Process(
+                            target=process_config['function'],
+                            args=process_config['args'])
+                    process_config['processes'].append(p)
+                    p.start()
 
             # download SAR and wind, starting the processing chain
             for sar_source in sar_sources:
