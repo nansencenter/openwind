@@ -157,9 +157,9 @@ class ERA5Source():
     def get_time(self):
         """Get the dataset time from the data"""
         if self._time is None:
-            self._time = datetime.fromisoformat(
-            xr.open_dataset(self.data_path, decode_coords='all').variables['valid_time']
-            .data[0].astype(str))
+            with xr.open_dataset(self.data_path, decode_coords='all') as dataset:
+                self._time = datetime.fromisoformat(
+                    dataset.variables['valid_time'].data[0].astype(str))
         return self._time
 
     def find_product(self, bbox_expansion: float = .1) -> cdsapi.api.Result:
