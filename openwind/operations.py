@@ -95,60 +95,64 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
     if out_file.exists():
         logger.info("Full dataset already exists at %s, skipping", out_file)
     else:
-        s1_dataset = xr.open_dataset(sar_source.preprocessed_path, decode_coords='all')
-        interp_wind_dataset = xr.open_dataset(wind_source.interpolated_path, decode_coords='all')
+        with xr.open_dataset(sar_source.preprocessed_path, decode_coords='all') as s1_dataset, \
+             xr.open_dataset(wind_source.interpolated_path, decode_coords='all'
+                             ) as interp_wind_dataset:
 
-        wind_dir = interp_wind_dataset['dir'].to_masked_array(copy=False)
+            wind_dir = interp_wind_dataset['dir'].to_masked_array(copy=False)
 
-        if gmf == 'cmod5.n':
-            gmf_inverse = cmod5n.cmod5n_inverse
-        elif gmf == 'cmod7':
-            gmf_inverse = cmod7.cmod7_inverse
+            if gmf == 'cmod5.n':
+                gmf_inverse = cmod5n.cmod5n_inverse
+            elif gmf == 'cmod7':
+                gmf_inverse = cmod7.cmod7_inverse
 
-        final_vars = {}
-        for var_name in s1_dataset.variables:
-            if var_name.startswith('sigma0'):
-                sar = s1_dataset[var_name].to_numpy()
-                sar[~wind_dir.mask] = np.nan
-                wind_speed = gmf_inverse(
-                    sar,
-                    wind_dir,
-                    s1_dataset['incidence'].to_numpy(),
-                    iterations=iterations
-                )
-                computed_u, computed_v = u_v_from_dir_speed(wind_dir, wind_speed)
-                final_vars[var_name] = s1_dataset[var_name]
-                final_vars[f"computed_wind_speed_from_{var_name}"] = (('row', 'col'), wind_speed)
-                final_vars[f"computed_u_from_{var_name}"] = (('row', 'col'), computed_u)
-                final_vars[f"computed_v_from_{var_name}"] = (('row', 'col'), computed_v)
+            final_vars = {}
+            for var_name in s1_dataset.variables:
+                if var_name.startswith('sigma0'):
+                    sar = s1_dataset[var_name].to_numpy()
+                    logger.info("Shape(%s): %s. Shape(wind): %s", var_name, sar.shape, wind_dir.shape)
+                    # do not generate wind speed where the wind direction
+                    # is not available
+                    sar[wind_dir.mask] = np.nan
+                    wind_speed = gmf_inverse(
+                        sar,
+                        wind_dir,
+                        s1_dataset['incidence'].to_numpy(),
+                        iterations=iterations
+                    )
+                    computed_u, computed_v = u_v_from_dir_speed(wind_dir, wind_speed)
+                    final_vars[var_name] = s1_dataset[var_name]
+                    final_vars[f"computed_wind_speed_from_{var_name}"] = (('row', 'col'), wind_speed)
+                    final_vars[f"computed_u_from_{var_name}"] = (('row', 'col'), computed_u)
+                    final_vars[f"computed_v_from_{var_name}"] = (('row', 'col'), computed_v)
 
-        try:
-            u10 = interp_wind_dataset['u10'].data
-            v10 = interp_wind_dataset['v10'].data
-        except KeyError:
-            u10, v10 = u_v_from_dir_speed(interp_wind_dataset['dir'].data,
-                                          interp_wind_dataset['speed'].data)
-        final_vars["u10"] = (('row', 'col'), u10)
-        final_vars["v10"] = (('row', 'col'), v10)
+            try:
+                u10 = interp_wind_dataset['u10'].data
+                v10 = interp_wind_dataset['v10'].data
+            except KeyError:
+                u10, v10 = u_v_from_dir_speed(interp_wind_dataset['dir'].data,
+                                            interp_wind_dataset['speed'].data)
+            final_vars["u10"] = (('row', 'col'), u10)
+            final_vars["v10"] = (('row', 'col'), v10)
 
-        full_dataset = xr.Dataset(
-            attrs=make_metadata(
-                sar_source,
-                wind_source.get_time(),
-                wind_source.model_name),
-            coords={
-                'lon': s1_dataset.coords['lon'],
-                'lat': s1_dataset.coords['lat'],
-            },
-            data_vars={
-                'watermask': s1_dataset['watermask'],
-                'incidence': s1_dataset['incidence'],
-                'model_wind_dir': interp_wind_dataset['dir'],
-                'model_wind_speed': interp_wind_dataset['speed'],
-                **final_vars,
-            },
-        )
-        full_dataset.to_netcdf(out_file)
+            full_dataset = xr.Dataset(
+                attrs=make_metadata(
+                    sar_source,
+                    wind_source.get_time(),
+                    wind_source.model_name),
+                coords={
+                    'lon': s1_dataset.coords['lon'],
+                    'lat': s1_dataset.coords['lat'],
+                },
+                data_vars={
+                    'watermask': s1_dataset['watermask'],
+                    'incidence': s1_dataset['incidence'],
+                    'model_wind_dir': interp_wind_dataset['dir'],
+                    'model_wind_speed': interp_wind_dataset['speed'],
+                    **final_vars,
+                },
+            )
+            full_dataset.to_netcdf(out_file)
     return out_file
 
 
@@ -167,95 +171,97 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
     if out_file.exists():
         logger.info("Plot already exists at %s, skipping", out_file)
     else:
-        full_dataset = xr.open_dataset(full_ds_path, decode_coords='all')
+        with xr.open_dataset(full_ds_path, decode_coords='all') as full_dataset:
+            sigma0_variables = []
+            computed_variables = []
+            for variable in full_dataset.variables:
+                if variable.startswith('sigma0'):
+                    sigma0_variables.append(variable)
+                elif variable.startswith('computed_'):
+                    computed_variables.append(variable)
+            sigma0_variables.sort()
+            computed_variables.sort()
+            base_variables = set(('u10', 'v10', 'model_wind_dir', 'model_wind_speed'))
 
-        sigma0_variables = []
-        computed_variables = []
-        for variable in full_dataset.variables:
-            if variable.startswith('sigma0'):
-                sigma0_variables.append(variable)
-            elif variable.startswith('computed_'):
-                computed_variables.append(variable)
-        sigma0_variables.sort()
-        computed_variables.sort()
-        base_variables = set(('u10', 'v10', 'model_wind_dir', 'model_wind_speed'))
+            # normalize s1
+            watermask = full_dataset['watermask'].to_numpy()
+            mask = None
+            for sigma0_var in sigma0_variables:
+                denoised = full_dataset[sigma0_var].to_masked_array(copy=False)
+                mask = np.logical_or(denoised.mask, watermask != 1.)
+                flat = denoised[~mask].flatten()
+                low, high = np.percentile(flat, (5, 95))
+                np.clip(denoised, low, high, denoised, casting='unsafe')
+                #normalize in the interval [0,100]
+                denoised[~mask] = ((denoised[~mask] - low) / (high - low)) * 100.
+                denoised[mask] = np.nan
 
-        # normalize s1
-        watermask = full_dataset['watermask'].to_numpy()
-        mask = None
-        for sigma0_var in sigma0_variables:
-            denoised = full_dataset[sigma0_var].to_masked_array(copy=False)
-            mask = np.logical_or(denoised.mask, watermask != 1.)
-            flat = denoised[~mask].flatten()
-            low, high = np.percentile(flat, (5, 95))
-            np.clip(denoised, low, high, denoised, casting='unsafe')
-            #normalize in the interval [0,100]
-            denoised[~mask] = ((denoised[~mask] - low) / (high - low)) * 100.
-            denoised[mask] = np.nan
+            # mask other variables
+            for variable in (*base_variables, *computed_variables):
+                full_dataset[variable].to_masked_array(copy=False)[mask] = np.nan
 
-        # mask other variables
-        for variable in (*base_variables, *computed_variables):
-            full_dataset[variable].to_masked_array(copy=False)[mask] = np.nan
+            nr_sigma0 = len(sigma0_variables)
 
-        nr_sigma0 = len(sigma0_variables)
+            ncols = nr_sigma0 if nr_sigma0 >= 2 else 2
+            nrows = 2 + nr_sigma0
 
-        ncols = nr_sigma0 if nr_sigma0 >= 2 else 2
-        nrows = 2 + nr_sigma0
+            fig, axs = plt.subplots(
+                subplot_kw={'projection': ccrs.epsg(3857)},
+                ncols=ncols,
+                nrows=nrows,
+                squeeze=False,
+                figsize=(2.*ncols, 2.*nrows),
+            )
 
-        fig, axs = plt.subplots(
-            subplot_kw={'projection': ccrs.epsg(3857)},
-            ncols=ncols,
-            nrows=nrows,
-            squeeze=False,
-            figsize=(2.*ncols, 2.*nrows),
-        )
+            for row in axs:
+                for ax in row:
+                    ax.set_extent(sar_source.bounding_box)
+                    ax.coastlines()
+                    ax.set_anchor('W')
+                    ax.set_xlabel('')
+                    ax.set_ylabel('')
 
-        for row in axs:
-            for ax in row:
-                ax.set_extent(sar_source.bounding_box)
-                ax.coastlines()
-                ax.set_anchor('W')
-                ax.set_xlabel('')
-                ax.set_ylabel('')
+            for i, var in enumerate(sigma0_variables):
+                full_dataset[var].plot(
+                    ax=axs[0, i],
+                    x='lon', y='lat', cmap='gray', transform=ccrs.PlateCarree(),
+                    add_labels=False, add_colorbar=False)
+                axs[0, i].set_title(var, fontsize='small')
 
-        for i, var in enumerate(sigma0_variables):
-            full_dataset[var].plot(
-                ax=axs[0, i],
-                x='lon', y='lat', cmap='gray', transform=ccrs.PlateCarree(),
-                add_labels=False, add_colorbar=False)
-            axs[0, i].set_title(var, fontsize='small')
+                full_dataset.plot.streamplot(
+                    ax=axs[2+i, 0], zorder=3,
+                    x='lon', y='lat', u=f'computed_u_from_{var}', v=f'computed_v_from_{var}',
+                    transform=ccrs.PlateCarree(),
+                    linewidth=.5, arrowsize=.5, density=3, hue=f'computed_wind_speed_from_{var}',
+                    cbar_kwargs={'ax': axs[2+i, 0], 'label': '', 'shrink': .7,
+                                 'extend': 'both', 'location': 'right'})
+                axs[2+i, 0].set_title(f"Wind from {var}", fontsize='small')
+
+                full_dataset[f'computed_wind_speed_from_{var}'].plot(
+                    ax=axs[2+i, 1],
+                    x='lon', y='lat', transform=ccrs.PlateCarree(),
+                    add_labels=False, #add_colorbar=False,
+                    cbar_kwargs={'ax': axs[2+i, 1], 'label': '', 'shrink': .7,
+                                 'extend': 'both', 'location': 'right'})
+                axs[2+i, 1].set_title(f"Wind speed from {var}", fontsize='small')
 
             full_dataset.plot.streamplot(
-                ax=axs[2+i, 0], zorder=3,
-                x='lon', y='lat', u=f'computed_u_from_{var}', v=f'computed_v_from_{var}',
-                transform=ccrs.PlateCarree(),
-                linewidth=.5, arrowsize=.5, density=3, hue=f'computed_wind_speed_from_{var}',
-                cbar_kwargs={'ax': axs[2+i, 0], 'label': '', 'shrink': .7, 'extend': 'both', 'location': 'right'})
-            axs[2+i, 0].set_title(f"Wind from {var}", fontsize='small')
+                ax=axs[1, 0], zorder=3,
+                x='lon', y='lat', u='u10', v='v10', transform=ccrs.PlateCarree(),
+                linewidth=.5, arrowsize=.5, density=3, hue='model_wind_speed',
+                cbar_kwargs={'ax': axs[1, 0], 'label': '', 'shrink': .7,
+                             'extend': 'both', 'location': 'right'})
+            axs[1, 0].set_title(f'{wind_source.model_name} wind', fontsize='small')
 
-            full_dataset[f'computed_wind_speed_from_{var}'].plot(
-                ax=axs[2+i, 1],
+            full_dataset['model_wind_speed'].plot(
+                ax=axs[1, 1],
                 x='lon', y='lat', transform=ccrs.PlateCarree(),
                 add_labels=False, #add_colorbar=False,
-                cbar_kwargs={'ax': axs[2+i, 1], 'label': '', 'shrink': .7, 'extend': 'both', 'location': 'right'})
-            axs[2+i, 1].set_title(f"Wind speed from {var}", fontsize='small')
+                cbar_kwargs={'ax': axs[1, 1], 'label': '', 'shrink': .7, 'extend': 'both', 'location': 'right'})
+            axs[1, 1].set_title(f"{wind_source.model_name} wind speed", fontsize='small')
 
-        full_dataset.plot.streamplot(
-            ax=axs[1, 0], zorder=3,
-            x='lon', y='lat', u='u10', v='v10', transform=ccrs.PlateCarree(),
-            linewidth=.5, arrowsize=.5, density=3, hue='model_wind_speed',
-            cbar_kwargs={'ax': axs[1, 0], 'label': '', 'shrink': .7, 'extend': 'both', 'location': 'right'})
-        axs[1, 0].set_title(f'{wind_source.model_name} wind', fontsize='small')
-
-        full_dataset['model_wind_speed'].plot(
-            ax=axs[1, 1],
-            x='lon', y='lat', transform=ccrs.PlateCarree(),
-            add_labels=False, #add_colorbar=False,
-            cbar_kwargs={'ax': axs[1, 1], 'label': '', 'shrink': .7, 'extend': 'both', 'location': 'right'})
-        axs[1, 1].set_title(f"{wind_source.model_name} wind speed", fontsize='small')
-
-        fig.tight_layout()
-        fig.savefig(out_file, dpi=300)
+            fig.tight_layout()
+            fig.savefig(out_file, dpi=300)
     return out_file
 
 

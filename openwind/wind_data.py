@@ -216,33 +216,34 @@ class ERA5Source():
         if out_file.exists():
             logger.info("Interpolated file already exists at %s, skipping", out_file)
         else:
-            s1_dataset = xr.open_dataset(denoised_s1_file, decode_coords='all')
-            era5_dataset = xr.open_dataset(self.data_path, decode_coords='all').isel(valid_time=0)
+            with xr.open_dataset(denoised_s1_file, decode_coords='all') as s1_dataset, \
+                 xr.open_dataset(self.data_path, decode_coords='all') as era5_dataset:
+                era5_dataset = era5_dataset.isel(valid_time=0)
 
-            interp_u10 = era5_dataset['u10'].interp(
-                longitude=s1_dataset.coords['lon'], latitude=s1_dataset.coords['lat'])
-            interp_v10 = era5_dataset['v10'].interp(
-                longitude=s1_dataset.coords['lon'], latitude=s1_dataset.coords['lat'])
+                interp_u10 = era5_dataset['u10'].interp(
+                    longitude=s1_dataset.coords['lon'], latitude=s1_dataset.coords['lat'])
+                interp_v10 = era5_dataset['v10'].interp(
+                    longitude=s1_dataset.coords['lon'], latitude=s1_dataset.coords['lat'])
 
-            wind_direction = direction_from(
-                interp_u10.to_masked_array(copy=False),
-                interp_v10.to_masked_array(copy=False))
-            wind_speed = magnitude(
-                interp_u10.to_masked_array(copy=False),
-                interp_v10.to_masked_array(copy=False))
-            interp_era5 = xr.Dataset(
-                data_vars={
-                    "u10": (('row', 'col'), interp_u10.data),
-                    "v10": (('row', 'col'), interp_v10.data),
-                    "dir": (('row', 'col'), wind_direction),
-                    "speed": (('row', 'col'), wind_speed),
-                },
-                coords={
-                    'lon': s1_dataset.coords['lon'],
-                    'lat': s1_dataset.coords['lat'],
-                }
-            )
-            interp_era5.to_netcdf(out_file)
+                wind_direction = direction_from(
+                    interp_u10.to_masked_array(copy=False),
+                    interp_v10.to_masked_array(copy=False))
+                wind_speed = magnitude(
+                    interp_u10.to_masked_array(copy=False),
+                    interp_v10.to_masked_array(copy=False))
+                interp_era5 = xr.Dataset(
+                    data_vars={
+                        "u10": (('row', 'col'), interp_u10.data),
+                        "v10": (('row', 'col'), interp_v10.data),
+                        "dir": (('row', 'col'), wind_direction),
+                        "speed": (('row', 'col'), wind_speed),
+                    },
+                    coords={
+                        'lon': s1_dataset.coords['lon'],
+                        'lat': s1_dataset.coords['lat'],
+                    }
+                )
+                interp_era5.to_netcdf(out_file)
         self.interpolated_path = out_file
         return out_file
 
@@ -338,28 +339,31 @@ class Sentinel1OCNSource():
         return self.data_path
 
     def geolocate_variable(self, file_path, variable_name):
-        """"""
-        s1_ocn_dataset = xr.open_dataset(file_path, decode_coords='all')
-        lines, pixels = s1_ocn_dataset.sizes['owiAzSize'], s1_ocn_dataset.sizes['owiRaSize']
-        gcps_line_spacing = lines // 20
-        gcps_pixel_spacing = pixels // 20
-        # get gcps, including the 4 corners
-        gcps = [
-            gdal.GCP(float(s1_ocn_dataset['owiLon'][i, j]), float(s1_ocn_dataset['owiLat'][i, j]), 0., j, i)
-            for i in [*range(0, lines, gcps_line_spacing), lines - 1]
-            for j in [*range(0, pixels, gcps_pixel_spacing), pixels - 1]
-        ]
-        translated_dir = f'/vsimem/{file_path.stem}_{variable_name}.tiff'
-        warped_dir = file_path.parent / f'warped_{file_path.stem}_{variable_name}.nc'
-        gdal.Translate(
-            str(translated_dir),
-            f"NETCDF:{file_path}:{variable_name}",
-            GCPs=gcps,
-            outputSRS='epsg:4326')
-        gdal.Warp(
-            str(warped_dir),
-            str(translated_dir),
-            dstSRS='epsg:4326')
+        """Create a new file containing the selected variable on a grid
+        geolocated with a geotransform
+        """
+        with xr.open_dataset(file_path, decode_coords='all') as s1_ocn_dataset:
+            lines, pixels = s1_ocn_dataset.sizes['owiAzSize'], s1_ocn_dataset.sizes['owiRaSize']
+            gcps_line_spacing = lines // 20
+            gcps_pixel_spacing = pixels // 20
+            # get gcps, including the 4 corners
+            gcps = [
+                gdal.GCP(float(s1_ocn_dataset['owiLon'][i, j]),
+                         float(s1_ocn_dataset['owiLat'][i, j]), 0., j, i)
+                for i in [*range(0, lines, gcps_line_spacing), lines - 1]
+                for j in [*range(0, pixels, gcps_pixel_spacing), pixels - 1]
+            ]
+            translated_dir = f'/vsimem/{file_path.stem}_{variable_name}.tiff'
+            warped_dir = file_path.parent / f'warped_{file_path.stem}_{variable_name}.nc'
+            gdal.Translate(
+                str(translated_dir),
+                f"NETCDF:{file_path}:{variable_name}",
+                GCPs=gcps,
+                outputSRS='epsg:4326')
+            gdal.Warp(
+                str(warped_dir),
+                str(translated_dir),
+                dstSRS='epsg:4326')
         return warped_dir
 
     def interpolate_on_sar_grid(self, out_dir: Path):
@@ -369,31 +373,38 @@ class Sentinel1OCNSource():
         logger.info("Interpolating %s on the grid of %s. Writing to %s",
                     self.data_path.name, denoised_s1_file, out_file)
 
-        if out_file.exists():
-            logger.info("Interpolated file already exists at %s, skipping", out_file)
-        else:
-            s1_dataset = xr.open_dataset(denoised_s1_file, decode_coords='all')
+        with xr.open_dataset(denoised_s1_file, decode_coords='all') as s1_dataset:
+            skip = False
+            if out_file.exists():
+                with xr.open_dataset(out_file) as existing_ds:
+                    if existing_ds.dims == s1_dataset.dims:
+                        skip = True
+                        logger.info("Interpolated file already exists at %s, skipping", out_file)
+            if not skip:
+                with xr.open_dataset(
+                        self.geolocate_variable(self.data_path, 'owiEcmwfWindDirection'),
+                        decode_coords='all') as geolocated_wind_dir, \
+                     xr.open_dataset(
+                        self.geolocate_variable(self.data_path, 'owiEcmwfWindSpeed'),
+                        decode_coords='all') as geolocated_wind_speed:
 
-            interp_dir = xr.open_dataset(
-                self.geolocate_variable(self.data_path, 'owiEcmwfWindDirection'),
-                decode_coords='all'
-            ).interp(lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+                    interp_dir = geolocated_wind_dir.interp(
+                        lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+                    interp_speed = geolocated_wind_speed.interp(
+                        lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
 
-            interp_speed = xr.open_dataset(
-                self.geolocate_variable(self.data_path, 'owiEcmwfWindSpeed'),
-                decode_coords='all'
-            ).interp(lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+                    interp_dataset = xr.Dataset(
+                        data_vars={
+                            "speed": (('row', 'col'), interp_speed['Band1'].data),
+                            "dir": (('row', 'col'), interp_dir['Band1'].data),
+                        },
+                        coords={
+                            'lon': s1_dataset.coords['lon'],
+                            'lat': s1_dataset.coords['lat'],
+                        }
+                    )
+                    interp_dataset.to_netcdf(out_file)
+                    interp_dataset.close()
 
-            interp_dataset = xr.Dataset(
-                data_vars={
-                    "speed": (('row', 'col'), interp_speed['Band1'].data),
-                    "dir": (('row', 'col'), interp_dir['Band1'].data),
-                },
-                coords={
-                    'lon': s1_dataset.coords['lon'],
-                    'lat': s1_dataset.coords['lat'],
-                }
-            )
-            interp_dataset.to_netcdf(out_file)
-        self.interpolated_path = out_file
-        return out_file
+            self.interpolated_path = out_file
+            return out_file
