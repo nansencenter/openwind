@@ -144,11 +144,10 @@ def preprocess_wind_data(
 
 
 class ERA5Source():
-    """"""
+    """Class used to manage an ERA5 wind source"""
     model_name = 'ERA5'
 
     def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
-        """"""
         self.sar_source = sar_source
         self.product = None
         self.data_path = data_path
@@ -156,7 +155,7 @@ class ERA5Source():
         self._time = None
 
     def get_time(self):
-        """"""
+        """Get the dataset time from the data"""
         if self._time is None:
             self._time = datetime.fromisoformat(
             xr.open_dataset(self.data_path, decode_coords='all').variables['valid_time']
@@ -164,7 +163,9 @@ class ERA5Source():
         return self._time
 
     def find_product(self, bbox_expansion: float = .1) -> cdsapi.api.Result:
-        """"""
+        """Find a product from the API which matches the coverage of
+        the SAR source
+        """
         logger.info("Looking for ERA5 dataset fitting %s", self.sar_source.identifier)
         west, east, south, north = self.sar_source.bounding_box
         west -= bbox_expansion
@@ -254,14 +255,13 @@ class Sentinel1OCNSource():
     model_name = 'ECMWF'
 
     def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
-        """"""
         self.sar_source = sar_source
         self.product = None
         self.data_path = data_path
         self.interpolated_path = None
 
     def find_product(self, bbox_expansion: float = .1):
-        """"""
+        """Find an ASF product matching the SAR source"""
         s1_shape = self.sar_source.get_shape()
 
         query = {
@@ -291,7 +291,8 @@ class Sentinel1OCNSource():
     #TODO: this is copy-pasted from Sentinel1Source. needs refactoring
     @property
     def identifier(self):
-        """"""
+        """Get an identifier from the ASF product or the file name
+        """
         if self.product:
             return self.product.properties['sceneName']
         elif self.data_path:
@@ -301,15 +302,17 @@ class Sentinel1OCNSource():
 
     @property
     def properties(self):
-        """"""
+        """Return the current ASF product's properties"""
         return self.product.properties
 
     def get_time(self):
-        """"""
+        """Get a datetime objects from the properties"""
         return datetime.fromisoformat(self.properties['startTime'])
 
     def download(self, out_dir: Union[str, Path]):
-        """"""
+        """Download the ASF product. If no product has been found yet,
+        try to find one.
+        """
         if self.product is None:
             self.find_product()
         target = Path(out_dir, self.product.properties['fileName'])
@@ -323,7 +326,7 @@ class Sentinel1OCNSource():
         return target
 
     def unzip(self, out_dir):
-        """"""
+        """Unzip the data file if necessary"""
         safe_name = f"{self.identifier}.SAFE/"
         safe_path = Path(out_dir, safe_name)
         if not safe_path.exists() and zipfile.is_zipfile(self.data_path):
@@ -367,7 +370,9 @@ class Sentinel1OCNSource():
         return warped_dir
 
     def interpolate_on_sar_grid(self, out_dir: Path):
-        """"""
+        """Interpolate the model wind speed and direction on the
+        preprocessed SAR data grid
+        """
         denoised_s1_file = self.sar_source.preprocessed_path
         out_file = out_dir / f'interp_{self.data_path.stem}.nc'
         logger.info("Interpolating %s on the grid of %s. Writing to %s",

@@ -316,25 +316,27 @@ class Sentinel1Source(SARSource):
 
     @property
     def start_time(self):
-        """"""
+        """Get the start time as a datetime object from the ASF product
+        """
         if self._start_time is None:
             self._start_time = dateutil.parser.parse(self.properties['startTime'])
         return self._start_time
 
     @property
     def end_time(self):
-        """"""
+        """Get the end time as a datetime object from the ASF product
+        """
         if self._end_time is None:
             self._end_time = dateutil.parser.parse(self.properties['stopTime'])
         return self._end_time
 
     @property
     def properties(self):
-        """"""
+        """Get the properties from the ASF product"""
         return self._asf_product.properties
 
     def download(self, out_dir, unzip=False):
-        """"""
+        """Download the dataset"""
         if self.data_path is None:
             target = Path(out_dir, self.properties['fileName'])
             files_to_check = [target]
@@ -357,7 +359,7 @@ class Sentinel1Source(SARSource):
         return self.data_path
 
     def unzip(self, out_dir, remove_zip=True):
-        """"""
+        """Unzip a downloaded file if necessary"""
         safe_name = f"{self.identifier}.SAFE/"
         safe_path = Path(out_dir, safe_name)
         if not safe_path.exists() and zipfile.is_zipfile(self.data_path):
@@ -398,6 +400,8 @@ class Sentinel1Source(SARSource):
         return denoised
 
     def preprocess(self, out_dir, algorithm='NERSC', polarizations=('VV',), pixel_size=500):
+        """Denoise and resize the dataset. Pixel size in meters.
+        """
         output_path = out_dir / f'denoised_{self.identifier}.nc'
         logger.info("Denoising %s (%s) using %s algorithm",
                     self.identifier, ','.join(polarizations), algorithm)
