@@ -101,6 +101,7 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
                              ) as interp_wind_dataset:
 
             wind_dir = interp_wind_dataset['dir'].to_masked_array(copy=False)
+            wind_sar_dir = interp_wind_dataset['sar_dir'].to_masked_array(copy=False)
 
             if gmf == 'cmod5.n':
                 gmf_inverse = cmod5n.cmod5n_inverse
@@ -113,10 +114,10 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
                     sar = s1_dataset[var_name].to_numpy()
                     # do not generate wind speed where the wind direction
                     # is not available
-                    sar[wind_dir.mask] = np.nan
+                    sar[wind_sar_dir.mask] = np.nan
                     wind_speed = gmf_inverse(
                         sar,
-                        wind_dir,
+                        wind_sar_dir,
                         s1_dataset['incidence'].to_numpy(),
                         iterations=iterations
                     )
@@ -148,6 +149,7 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
                     'watermask': s1_dataset['watermask'],
                     'incidence': s1_dataset['incidence'],
                     'model_wind_dir': interp_wind_dataset['dir'],
+                    'model_wind_sar_dir': interp_wind_dataset['sar_dir'],
                     'model_wind_speed': interp_wind_dataset['speed'],
                     **final_vars,
                 },
@@ -205,6 +207,9 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
             ncols = nr_sigma0 if nr_sigma0 >= 2 else 2
             nrows = 2 + nr_sigma0
 
+            min_wind = 0.
+            max_wind = 20.
+
             fig, axs = plt.subplots(
                 subplot_kw={'projection': ccrs.epsg(3857)},
                 ncols=ncols,
@@ -222,42 +227,51 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
                     ax.set_ylabel('')
 
             for i, var in enumerate(sigma0_variables):
+                # SAR data
                 full_dataset[var].plot(
                     ax=axs[0, i],
                     x='lon', y='lat', cmap='gray', transform=ccrs.PlateCarree(),
                     add_labels=False, add_colorbar=False)
                 axs[0, i].set_title(var, fontsize='small')
 
+                # wind streamlines: direction from model, speed from SAR
                 full_dataset.plot.streamplot(
                     ax=axs[2+i, 0], zorder=3,
                     x='lon', y='lat', u=f'computed_u_from_{var}', v=f'computed_v_from_{var}',
+                    vmin=min_wind, vmax=max_wind,
                     transform=ccrs.PlateCarree(),
                     linewidth=.5, arrowsize=.5, density=3, hue=f'computed_wind_speed_from_{var}',
-                    cbar_kwargs={'ax': axs[2+i, 0], 'label': '', 'shrink': .7,
+                    cbar_kwargs={'ax': axs[2+i, 0], 'label': '', 'shrink': .5,
                                  'extend': 'both', 'location': 'right'})
                 axs[2+i, 0].set_title(f"Wind from {var}", fontsize='small')
 
+                # wind speed from SAR
                 full_dataset[f'computed_wind_speed_from_{var}'].plot(
                     ax=axs[2+i, 1],
                     x='lon', y='lat', transform=ccrs.PlateCarree(),
+                    vmin=min_wind, vmax=max_wind,
                     add_labels=False, #add_colorbar=False,
-                    cbar_kwargs={'ax': axs[2+i, 1], 'label': '', 'shrink': .7,
+                    cbar_kwargs={'ax': axs[2+i, 1], 'label': '', 'shrink': .5,
                                  'extend': 'both', 'location': 'right'})
                 axs[2+i, 1].set_title(f"Wind speed from {var}", fontsize='small')
 
+            # wind streamlines from model
             full_dataset.plot.streamplot(
                 ax=axs[1, 0], zorder=3,
                 x='lon', y='lat', u='u10', v='v10', transform=ccrs.PlateCarree(),
+                vmin=min_wind, vmax=max_wind,
                 linewidth=.5, arrowsize=.5, density=3, hue='model_wind_speed',
-                cbar_kwargs={'ax': axs[1, 0], 'label': '', 'shrink': .7,
+                cbar_kwargs={'ax': axs[1, 0], 'label': '', 'shrink': .5,
                              'extend': 'both', 'location': 'right'})
             axs[1, 0].set_title(f'{wind_source.model_name} wind', fontsize='small')
 
+            # wind speed from model
             full_dataset['model_wind_speed'].plot(
                 ax=axs[1, 1],
                 x='lon', y='lat', transform=ccrs.PlateCarree(),
+                vmin=min_wind, vmax=max_wind,
                 add_labels=False, #add_colorbar=False,
-                cbar_kwargs={'ax': axs[1, 1], 'label': '', 'shrink': .7, 'extend': 'both', 'location': 'right'})
+                cbar_kwargs={'ax': axs[1, 1], 'label': '', 'shrink': .5, 'extend': 'both', 'location': 'right'})
             axs[1, 1].set_title(f"{wind_source.model_name} wind speed", fontsize='small')
 
             fig.tight_layout()

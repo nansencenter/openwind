@@ -230,6 +230,9 @@ class ERA5Source():
                 wind_direction = direction_from(
                     interp_u10.to_masked_array(copy=False),
                     interp_v10.to_masked_array(copy=False))
+                wind_sar_direction = wind2sar_direction(
+                    wind_direction,
+                    s1_dataset['look_direction'].to_masked_array(copy=False))
                 wind_speed = magnitude(
                     interp_u10.to_masked_array(copy=False),
                     interp_v10.to_masked_array(copy=False))
@@ -238,6 +241,7 @@ class ERA5Source():
                         "u10": (('row', 'col'), interp_u10.data),
                         "v10": (('row', 'col'), interp_v10.data),
                         "dir": (('row', 'col'), wind_direction),
+                        "sar_dir": (('row', 'col'), wind_sar_direction),
                         "speed": (('row', 'col'), wind_speed),
                     },
                     coords={
@@ -397,6 +401,9 @@ class Sentinel1OCNSource():
 
                     interp_dir = geolocated_wind_dir.interp(
                         lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+                    interp_sar_dir = wind2sar_direction(
+                        interp_dir['Band1'].to_masked_array(copy=False),
+                        s1_dataset['look_direction'].to_masked_array(copy=False))
                     interp_speed = geolocated_wind_speed.interp(
                         lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
 
@@ -404,6 +411,7 @@ class Sentinel1OCNSource():
                         data_vars={
                             "speed": (('row', 'col'), interp_speed['Band1'].data),
                             "dir": (('row', 'col'), interp_dir['Band1'].data),
+                            "sar_dir": (('row', 'col'), interp_sar_dir),
                         },
                         coords={
                             'lon': s1_dataset.coords['lon'],
