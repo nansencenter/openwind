@@ -132,7 +132,7 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
                 v10 = interp_wind_dataset['v10'].data
             except KeyError:
                 u10, v10 = u_v_from_dir_speed(interp_wind_dataset['dir'].data,
-                                            interp_wind_dataset['speed'].data)
+                                              interp_wind_dataset['speed'].data)
             final_vars["u10"] = (('row', 'col'), u10)
             final_vars["v10"] = (('row', 'col'), v10)
 
@@ -348,7 +348,7 @@ def thread_download(
     downloaded_queue.put((sar_source, wind_source))
 
 
-def process_preprocess(
+def multiprocess_preprocess(
         downloaded_queue: multiprocessing.Queue,
         preprocessed_queue: multiprocessing.Queue,
         denoised_dir: Path,
@@ -373,7 +373,7 @@ def process_preprocess(
             logger.error("Error during preprocessing of %s", sar_source.identifier, exc_info=True)
 
 
-def process_make_dataset(
+def multiprocess_make_dataset(
         preprocessed_queue: multiprocessing.Queue,
         processed_queue: multiprocessing.Queue,
         output_dir: Path,
@@ -397,7 +397,7 @@ def process_make_dataset(
                          sar_source.identifier, exc_info=True)
 
 
-def process_plot_dataset(
+def multiprocess_plot_dataset(
         processed_queue: multiprocessing.Queue,
         plot_dir: Path):
     """Plot the full dataset. Meant to be run in a separate process
@@ -480,14 +480,14 @@ def generate_product(
         'preprocess': {
             'input_queue': downloaded_queue,
             'workers': max_preprocess_workers,
-            'function': process_preprocess,
+            'function': multiprocess_preprocess,
             'args': (downloaded_queue, preprocessed_queue, denoised_dir, ('VV',), wind_folder),
             'processes': [],
         },
         'process': {
             'input_queue': preprocessed_queue,
             'workers': max_process_workers,
-            'function': process_make_dataset,
+            'function': multiprocess_make_dataset,
             'args': (preprocessed_queue, processed_queue, output_dir, gmf, iterations),
             'processes': [],
         },
@@ -496,7 +496,7 @@ def generate_product(
         processes['plot'] = {
             'input_queue': processed_queue,
             'workers': max_plot_workers,
-            'function': process_plot_dataset,
+            'function': multiprocess_plot_dataset,
             'args': (processed_queue, plot_dir),
             'processes': [],
         }
