@@ -82,6 +82,7 @@ def make_metadata(sar_source:sar_data.SARSource, wind_time, wind_model='ERA5', g
 
 def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA5Source,
                       out_dir: Path,
+                      full_ds_file_name: str = None,
                       gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n', iterations: int = 10):
     """Generate the full dataset, which includes:
         - the original SAR data (sigma0, incidence angle, watermask)
@@ -89,8 +90,10 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
         - the original wind model data (speed+direction or u+v)
         - the wind speed generated from each sigma0 variable
     """
-    out_file = Path(
-        out_dir, f"{gmf.replace('.', '')}_{wind_source.model_name}_{sar_source.identifier}.nc")
+    if not full_ds_file_name:
+        full_ds_file_name = (
+            f"{gmf.replace('.', '')}_{wind_source.model_name}_{sar_source.identifier}.nc")
+    out_file = Path(out_dir, full_ds_file_name)
     logger.info("Creating full dataset at %s", out_file)
 
     if out_file.exists():
@@ -377,11 +380,13 @@ def multiprocess_preprocess(
 
 
 def multiprocess_make_dataset(
-        preprocessed_queue: multiprocessing.Queue,
+        preprocessed_queue: multiprocessing.Queue[tuple[sar_data.SARSource, wind_data.ERA5Source]],
         processed_queue: multiprocessing.Queue,
         output_dir: Path,
         gmf: str,
-        iterations: int):
+        iterations: int,
+        product_version: str = '1.0',
+        file_version: str = '1.0'):
     """Create the full dataset. Meant to be run in a separate process
     """
     logger.debug("Starting dataset making process")
@@ -393,7 +398,12 @@ def multiprocess_make_dataset(
         sar_source, wind_source = next_item
         try:
             full_dataset_path = make_full_dataset(
-                sar_source, wind_source, output_dir, gmf, iterations=iterations)
+                sar_source=sar_source, wind_source=wind_source,
+                out_dir=output_dir,
+                full_ds_file_name=(
+                    f"{sar_source.platform}_{sar_source.start_time.strftime('%Y%m%d%H%M%S')}"
+                    f"_SARWIND_v{product_version}_fv{file_version}.nc"),
+                gmf=gmf, iterations=iterations)
             processed_queue.put((sar_source, wind_source, full_dataset_path))
         except Exception:
             logger.error("Error during dataset creation for %s",
