@@ -53,9 +53,9 @@ def make_metadata(sar_source:sar_data.SARSource, wind_time, wind_model='ERA5', g
         'BEAM_MODE': sar_source.properties['beamModeType'],
         'BEAM_SWATH': sar_source.properties['beamModeType'],
         'SWATH': sar_source.properties['beamModeType'],
-        'data_center': '{"Bucket_Level0": "CONSORTIA/INSTITUTIONS", "Bucket_Level1": "", "Bucket_Level2": "", "Bucket_Level3": "", "Short_Name": "NERSC", "Long_Name": "Nansen Environmental and Remote Sensing Centre", "Data_Center_URL": "http://www.nersc.no/main/index2.php"}',
-        'entry_title': 'Wind field from S1A_IW_GRDH_1SDV_20200404T044634_20200404T044659_031973_03B148_2646.nc',
-        'instrument': '{"Category": "Earth Remote Sensing Instruments", "Class": "Active Remote Sensing", "Type": "Imaging Radars", "Subtype": "", "Short_Name": "SAR", "Long_Name": "Synthetic Aperture Radar"}',
+        'data_center': "Nansen Environmental and Remote Sensing Centre",
+        'title': f'Wind field from {sar_source.identifier}',
+        'instrument': 'SAR (Synthetic Aperture Radar)',
         'ISO_topic_category': 'Imagery/Base Maps/Earth Cover',
         'keywords': "['Earth Science', 'Spectral/Engineering', 'RADAR', 'RADAR backscatter'], ['Earth Science', 'Spectral/Engineering', 'RADAR', 'RADAR imagery'], ['Earth Science', 'Spectral/Engineering', 'Microwave', 'Microwave Imagery'], ['EARTH SCIENCE', 'ATMOSPHERE', 'ATMOSPHERIC WINDS', 'SURFACE WINDS', 'U/V WIND COMPONENTS']",
         'keywords_vocabulary': 'GCMD Science Keywords',
@@ -70,13 +70,16 @@ def make_metadata(sar_source:sar_data.SARSource, wind_time, wind_model='ERA5', g
         'PRODUCT_TYPE': sar_source.properties['processingLevel'],
         'SATELLITE_IDENTIFIER': sar_source.properties['platform'][:-1],
         'SENSOR_IDENTIFIER': sar_source.properties['sensor'],
-        'summary': f'Near surface (10m) wind from Sentinel-1 C-band SAR GRD product and {wind_model} wind model, computed using the {gmf.upper()} algorithm (https://scatterometer.knmi.nl/)',
+        'summary': (
+            f'Near surface (10m) wind from SAR ({sar_source.platform}) and {wind_model} wind model,'
+            ' computed using the {gmf.upper()} GMF (https://scatterometer.knmi.nl/). This product '
+            'was generated using Openwind (https://github.com/nansencenter/openwind/)'),
         'time_coverage_end': time_end.astimezone(timezone.utc).isoformat(),
         'time_coverage_start': time_start.astimezone(timezone.utc).isoformat(),
         'title': 'Near surface wind from Sentinel-1 GRD data',
         'winddir_time': wind_time.astimezone(timezone.utc).isoformat(),
         'WIND_DIRECTION_SOURCE': wind_model,
-        'project': 'OpenWind',
+        'project': 'C3-eKerala',
     }
 
 
