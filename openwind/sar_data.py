@@ -208,6 +208,10 @@ class SARSource():
         raise NotImplementedError()
 
     @property
+    def platform(self):
+        raise NotImplementedError()
+
+    @property
     def bounding_box(self):
         """"""
         raise NotImplementedError()
@@ -289,6 +293,10 @@ class Sentinel1Source(SARSource):
     def identifier(self):
         """"""
         return self.properties['sceneName']
+
+    @property
+    def platform(self):
+        return self.identifier[:3]
 
     @property
     def bounding_box(self):
@@ -473,6 +481,10 @@ class EnvisatASARSource(SARSource):
     def identifier(self):
         """"""
         return self.data_path.stem
+
+    @property
+    def platform(self):
+        return 'ASA'
 
     @property
     def bounding_box(self):
