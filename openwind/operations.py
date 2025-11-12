@@ -35,7 +35,10 @@ class Done:
     """Put in a Queue to signal the end of processing"""
 
 
-def make_metadata(sar_source:sar_data.SARSource, wind_time, wind_model='ERA5', gmf='cmod5.n'):
+def make_metadata(sar_source:sar_data.SARSource,
+                  wind_time, wind_model='ERA5',
+                  gmf='cmod5.n',
+                  pixel_size: int = 500):
     """Generate the metadata for the full product"""
     extent = sar_source.bounding_box
     time_start = sar_source.start_time
@@ -80,6 +83,7 @@ def make_metadata(sar_source:sar_data.SARSource, wind_time, wind_model='ERA5', g
         'winddir_time': wind_time.astimezone(timezone.utc).isoformat(),
         'WIND_DIRECTION_SOURCE': wind_model,
         'project': 'C3-eKerala',
+        'pixel_size': f"{pixel_size}m"
     }
 
 
@@ -116,50 +120,36 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
                 gmf_inverse = cmod7.cmod7_inverse
 
             final_vars = {}
-            for var_name in s1_dataset.variables:
-                if var_name.startswith('sigma0'):
-                    sar = s1_dataset[var_name].to_numpy()
-                    # do not generate wind speed where the wind direction
-                    # is not available
-                    sar[wind_sar_dir.mask] = np.nan
-                    wind_speed = gmf_inverse(
-                        sar,
-                        wind_sar_dir,
-                        s1_dataset['incidence'].to_numpy(),
-                        iterations=iterations
-                    )
-                    computed_u, computed_v = u_v_from_dir_speed(wind_dir, wind_speed)
-                    final_vars[var_name] = (dimensions, [s1_dataset[var_name].data])
-                    final_vars[f"computed_wind_speed_from_{var_name}"] = (dimensions, [wind_speed])
-                    final_vars[f"computed_u_from_{var_name}"] = (dimensions, [computed_u])
-                    final_vars[f"computed_v_from_{var_name}"] = (dimensions, [computed_v])
-
-            try:
-                u10 = interp_wind_dataset['u10'].data
-                v10 = interp_wind_dataset['v10'].data
-            except KeyError:
-                u10, v10 = u_v_from_dir_speed(interp_wind_dataset['dir'].data,
-                                              interp_wind_dataset['speed'].data)
-            final_vars["u10"] = (dimensions, [u10])
-            final_vars["v10"] = (dimensions, [v10])
+            sar = s1_dataset['sigma0'].to_numpy()
+            # do not generate wind speed where the wind direction
+            # is not available
+            sar[wind_sar_dir.mask] = np.nan
+            wind_speed = gmf_inverse(
+                sar,
+                wind_sar_dir,
+                s1_dataset['angle_of_incidence'].to_numpy(),
+                iterations=iterations
+            )
 
             full_dataset = xr.Dataset(
                 attrs=make_metadata(
                     sar_source,
                     wind_source.get_time(),
-                    wind_source.model_name),
+                    wind_source.model_name,
+                    s1_dataset.attrs['pixel_size']),
                 coords={
-                    'lon': (dimensions, [s1_dataset.coords['lon'].data]),
-                    'lat': (dimensions, [s1_dataset.coords['lat'].data]),
+                    'longitude': (dimensions, [s1_dataset.coords['longitude'].data]),
+                    'latitude': (dimensions, [s1_dataset.coords['latitude'].data]),
                     'time': [np.datetime64(sar_source.start_time.isoformat())],
                 },
                 data_vars={
-                    'watermask': (dimensions, [s1_dataset['watermask'].data]),
-                    'incidence': (dimensions, [s1_dataset['incidence'].data]),
-                    'model_wind_dir': (dimensions, [interp_wind_dataset['dir'].data]),
-                    'model_wind_sar_dir': (dimensions, [interp_wind_dataset['sar_dir'].data]),
-                    'model_wind_speed': (dimensions, [interp_wind_dataset['speed'].data]),
-                    **final_vars,
+                    'sea_binary_mask': (dimensions, [s1_dataset['sea_binary_mask'].data]),
+                    'angle_of_incidence': (dimensions, [s1_dataset['angle_of_incidence'].data]),
+                    'wind_from_direction_model': (dimensions, [interp_wind_dataset['dir'].data]),
+                    # 'wind_sar_direction_model': (dimensions, [interp_wind_dataset['sar_dir'].data]),
+                    'wind_speed_model': (dimensions, [interp_wind_dataset['speed'].data]),
+                    'sigma0': (dimensions, [s1_dataset['sigma0'].data], s1_dataset['sigma0'].attrs),
+                    'wind_speed_sar': (dimensions, [wind_speed]),
                 },
             )
             full_dataset.to_netcdf(out_file)
@@ -181,50 +171,34 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
     if out_file.exists():
         logger.info("Plot already exists at %s, skipping", out_file)
     else:
-        with xr.open_dataset(full_ds_path, decode_coords='all') as full_dataset:
+        with xr.open_dataset(full_ds_path, decode_coords='all') as full_dataset, \
+             xr.open_dataset(wind_source.interpolated_path, decode_coords='all'
+                             ) as interp_wind_dataset:
             full_ds_time0 = full_dataset.isel(time=0)
-            sigma0_variables = []
-            computed_variables = []
-            for variable in full_ds_time0.variables:
-                if variable.startswith('sigma0'):
-                    sigma0_variables.append(variable)
-                elif variable.startswith('computed_'):
-                    computed_variables.append(variable)
-            sigma0_variables.sort()
-            computed_variables.sort()
-            base_variables = set(('u10', 'v10', 'model_wind_dir', 'model_wind_speed'))
 
             # normalize s1
-            watermask = full_ds_time0['watermask'].to_numpy()
+            watermask = full_ds_time0['sea_binary_mask'].to_numpy()
             mask = None
-            for sigma0_var in sigma0_variables:
-                denoised = full_ds_time0[sigma0_var].to_masked_array(copy=False)
-                mask = np.logical_or(denoised.mask, watermask != 1.)
-                flat = denoised[~mask].flatten()
-                low, high = np.percentile(flat, (5, 95))
-                np.clip(denoised, low, high, denoised, casting='unsafe')
-                #normalize in the interval [0,100]
-                denoised[~mask] = ((denoised[~mask] - low) / (high - low)) * 100.
-                denoised[mask] = np.nan
+            sigma0_var = 'sigma0'
+            sigma0_data = full_ds_time0[sigma0_var].to_masked_array(copy=False)
+            mask = np.logical_or(sigma0_data.mask, watermask != 1.)
+            flat = sigma0_data[~mask].flatten()
+            low, high = np.percentile(flat, (5, 95))
+            np.clip(sigma0_data, low, high, sigma0_data, casting='unsafe')
+            #normalize in the interval [0,100]
+            sigma0_data[~mask] = ((sigma0_data[~mask] - low) / (high - low)) * 100.
+            sigma0_data[mask] = np.nan
 
             # mask other variables
-            for variable in (*base_variables, *computed_variables):
-                full_ds_time0[variable].to_masked_array(copy=False)[mask] = np.nan
-
-            nr_sigma0 = len(sigma0_variables)
-
-            ncols = nr_sigma0 if nr_sigma0 >= 2 else 2
-            nrows = 2 + nr_sigma0
-
             min_wind = 0.
             max_wind = 20.
 
             fig, axs = plt.subplots(
                 subplot_kw={'projection': ccrs.epsg(3857)},
-                ncols=ncols,
-                nrows=nrows,
+                ncols=2,
+                nrows=3,
                 squeeze=False,
-                figsize=(2.*ncols, 2.*nrows),
+                figsize=(4., 6.),
             )
 
             for row in axs:
@@ -235,53 +209,67 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
                     ax.set_xlabel('')
                     ax.set_ylabel('')
 
-            for i, var in enumerate(sigma0_variables):
-                # SAR data
-                full_ds_time0[var].plot(
-                    ax=axs[0, i],
-                    x='lon', y='lat', cmap='gray', transform=ccrs.PlateCarree(),
-                    add_labels=False, add_colorbar=False)
-                axs[0, i].set_title(var, fontsize='small')
+            # SAR data
+            full_ds_time0[sigma0_var].plot(
+                ax=axs[0, 0],
+                x='longitude', y='latitude', cmap='gray', transform=ccrs.PlateCarree(),
+                add_labels=False, add_colorbar=False)
+            axs[0, 0].set_title(sigma0_var, fontsize='small')
 
-                # wind streamlines: direction from model, speed from SAR
-                full_ds_time0.plot.streamplot(
-                    ax=axs[2+i, 0], zorder=3,
-                    x='lon', y='lat', u=f'computed_u_from_{var}', v=f'computed_v_from_{var}',
-                    vmin=min_wind, vmax=max_wind,
-                    transform=ccrs.PlateCarree(),
-                    linewidth=.5, arrowsize=.5, density=3, hue=f'computed_wind_speed_from_{var}',
-                    cbar_kwargs={'ax': axs[2+i, 0], 'label': '', 'shrink': .5,
-                                 'extend': 'both', 'location': 'right'})
-                axs[2+i, 0].set_title(f"Wind from {var}", fontsize='small')
-
-                # wind speed from SAR
-                full_ds_time0[f'computed_wind_speed_from_{var}'].plot(
-                    ax=axs[2+i, 1],
-                    x='lon', y='lat', transform=ccrs.PlateCarree(),
-                    vmin=min_wind, vmax=max_wind,
-                    add_labels=False, #add_colorbar=False,
-                    cbar_kwargs={'ax': axs[2+i, 1], 'label': '', 'shrink': .5,
-                                 'extend': 'both', 'location': 'right'})
-                axs[2+i, 1].set_title(f"Wind speed from {var}", fontsize='small')
-
-            # wind streamlines from model
-            full_ds_time0.plot.streamplot(
+            # wind streamlines: direction from model, speed from SAR
+            u, v = u_v_from_dir_speed(
+                full_ds_time0['wind_from_direction_model'].to_masked_array(copy=True),
+                full_ds_time0['wind_speed_sar'].to_masked_array(copy=True))
+            u[mask] = np.nan
+            v[mask] = np.nan
+            temp_ds = xr.Dataset(
+                coords=full_ds_time0.coords,
+                data_vars={
+                    'u': (full_ds_time0.dims, u),
+                    'v': (full_ds_time0.dims, v),
+                    'wind_speed_sar': full_ds_time0['wind_speed_sar']
+                }
+            )
+            temp_ds.plot.streamplot(
                 ax=axs[1, 0], zorder=3,
-                x='lon', y='lat', u='u10', v='v10', transform=ccrs.PlateCarree(),
+                x='longitude', y='latitude', u='u', v='v',
                 vmin=min_wind, vmax=max_wind,
-                linewidth=.5, arrowsize=.5, density=3, hue='model_wind_speed',
+                transform=ccrs.PlateCarree(),
+                linewidth=.5, arrowsize=.5, density=3, hue=f'wind_speed_sar',
                 cbar_kwargs={'ax': axs[1, 0], 'label': '', 'shrink': .5,
-                             'extend': 'both', 'location': 'right'})
-            axs[1, 0].set_title(f'{wind_source.model_name} wind', fontsize='small')
+                                'extend': 'both', 'location': 'right'})
+            axs[1, 0].set_title(f"Wind from SAR", fontsize='small')
 
-            # wind speed from model
-            full_ds_time0['model_wind_speed'].plot(
+            # wind speed from SAR
+            full_ds_time0['wind_speed_sar'].to_masked_array(copy=False)[mask] = np.nan
+            full_ds_time0['wind_speed_sar'].plot(
                 ax=axs[1, 1],
-                x='lon', y='lat', transform=ccrs.PlateCarree(),
+                x='longitude', y='latitude', transform=ccrs.PlateCarree(),
                 vmin=min_wind, vmax=max_wind,
                 add_labels=False, #add_colorbar=False,
-                cbar_kwargs={'ax': axs[1, 1], 'label': '', 'shrink': .5, 'extend': 'both', 'location': 'right'})
-            axs[1, 1].set_title(f"{wind_source.model_name} wind speed", fontsize='small')
+                cbar_kwargs={'ax': axs[1, 1], 'label': '', 'shrink': .5,
+                                'extend': 'both', 'location': 'right'})
+            axs[1, 1].set_title("Wind speed from SAR", fontsize='small')
+
+            # wind streamlines from model
+            interp_wind_dataset.plot.streamplot(
+                ax=axs[2, 0], zorder=3,
+                x='longitude', y='latitude', u='u10', v='v10', transform=ccrs.PlateCarree(),
+                vmin=min_wind, vmax=max_wind,
+                linewidth=.5, arrowsize=.5, density=3, hue='speed',
+                cbar_kwargs={'ax': axs[2, 0], 'label': '', 'shrink': .5,
+                             'extend': 'both', 'location': 'right'})
+            axs[2, 0].set_title(f'{wind_source.model_name} wind', fontsize='small')
+
+            # wind speed from model
+            full_ds_time0['wind_speed_model'].to_masked_array(copy=False)[mask] = np.nan
+            full_ds_time0['wind_speed_model'].plot(
+                ax=axs[2, 1],
+                x='longitude', y='latitude', transform=ccrs.PlateCarree(),
+                vmin=min_wind, vmax=max_wind,
+                add_labels=False, #add_colorbar=False,
+                cbar_kwargs={'ax': axs[2, 1], 'label': '', 'shrink': .5, 'extend': 'both', 'location': 'right'})
+            axs[2, 1].set_title(f"{wind_source.model_name} wind speed", fontsize='small')
 
             fig.tight_layout()
             fig.savefig(out_file, dpi=300)
@@ -361,8 +349,9 @@ def multiprocess_preprocess(
         downloaded_queue: multiprocessing.Queue,
         preprocessed_queue: multiprocessing.Queue,
         denoised_dir: Path,
-        polarizations: tuple[str],
-        wind_folder: Path):
+        polarization: str,
+        wind_folder: Path,
+        pixel_size: int = 500):
     """Preprocess SAR (denoise, resize) and wind data (interpolate),
     then generate the full dataset.
     Meant to be run in a separate process
@@ -375,7 +364,7 @@ def multiprocess_preprocess(
             break
         sar_source, wind_source = next_item
         try:
-            sar_source.preprocess(denoised_dir, polarizations=polarizations)
+            sar_source.preprocess(denoised_dir, polarization=polarization, pixel_size=pixel_size)
             wind_source.interpolate_on_sar_grid(wind_folder)
             preprocessed_queue.put((sar_source, wind_source))
         except Exception:
@@ -383,7 +372,7 @@ def multiprocess_preprocess(
 
 
 def multiprocess_make_dataset(
-        preprocessed_queue: multiprocessing.Queue[tuple[sar_data.SARSource, wind_data.ERA5Source]],
+        preprocessed_queue: multiprocessing.Queue,
         processed_queue: multiprocessing.Queue,
         output_dir: Path,
         gmf: str,
@@ -467,7 +456,8 @@ def generate_product(
         max_download_workers: int = 10,
         max_preprocess_workers: int = 5,
         max_process_workers: int = 10,
-        max_plot_workers: int = 5):
+        max_plot_workers: int = 5,
+        pixel_size: int = 500):
     """Generate a full data product for the specified time and space extents"""
     sar_input_params = check_sar_input(extent, time_start, time_end, s1_identifiers, sar_files)
 
@@ -497,7 +487,10 @@ def generate_product(
             'input_queue': downloaded_queue,
             'workers': max_preprocess_workers,
             'function': multiprocess_preprocess,
-            'args': (downloaded_queue, preprocessed_queue, denoised_dir, ('VV',), wind_folder),
+            'args': (
+                downloaded_queue, preprocessed_queue,
+                denoised_dir, 'VV', wind_folder,
+                pixel_size),
             'processes': [],
         },
         'process': {

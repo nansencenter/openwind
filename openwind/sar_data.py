@@ -407,53 +407,46 @@ class Sentinel1Source(SARSource):
                 ).astype(np.float32)
         return denoised
 
-    def preprocess(self, out_dir, algorithm='NERSC', polarizations=('VV',), pixel_size=500):
+    def preprocess(self, out_dir, algorithm='NERSC', polarization='VV', pixel_size=500):
         """Denoise and resize the dataset. Pixel size in meters.
         """
         output_path = out_dir / f'denoised_{self.identifier}.nc'
         logger.info("Denoising %s (%s) using %s algorithm",
-                    self.identifier, ','.join(polarizations), algorithm)
+                    self.identifier, polarization, algorithm)
 
         if output_path.exists():
             logger.info("Denoised file already exists: %s", output_path)
         else:
-            denoised = self._run_s1_correction(polarizations=polarizations, algorithm=algorithm)
+            denoised = self._run_s1_correction(polarizations=(polarization,), algorithm=algorithm)
 
             logger.info(f'Creating denoised dataset at {output_path}...')
             s1_orig = Nansat(str(self.data_path))
-            for pol in denoised:
-                pol_low = pol.lower()
-                s1_orig.add_band(denoised[pol], parameters={
-                    'name': f'sigma0_{pol_low}_denoised',
-                    'algorithm': algorithm,
-                    'units': 'dB'
-                })
+            s1_orig.add_band(denoised[polarization], parameters={
+                'name': f'sigma0_denoised',
+                'algorithm': algorithm,
+                'units': 'dB',
+                'polarization': polarization,
+            })
 
             s1_orig.resize(pixelsize=pixel_size, resample_alg=0)
             lon_grd, lats_grd = s1_orig.get_geolocation_grids()
             watermask = s1_orig.watermask()
 
-            denoised_vars = {}
-            for pol in denoised:
-                pol_low = pol.lower()
-                band = f"sigma0_{pol_low}_denoised"
-                denoised_vars[band] = (
-                    ('row', 'col'),
-                    db2linear(s1_orig[band]),
-                    {'polarization': pol, '_FillValue': -999.})
-
             s1_dataset = xr.Dataset(
                 data_vars={
-                    "sigma0": (('row', 'col'), s1_orig['sigma0_VV'], {'polarization': 'VV', '_FillValue': -999.}),
-                    "watermask": (('row', 'col'), watermask[1], {'source': 'MOD44W', '_FillValue': -999.}),
-                    "incidence": (('row', 'col'), s1_orig['incidence_angle']),
+                    "sigma0": (
+                        ('row', 'col'),
+                        db2linear(s1_orig['sigma0_denoised']),
+                        {'polarization': polarization, '_FillValue': -999.}),
+                    "sea_binary_mask": (('row', 'col'), watermask[1], {'source': 'MOD44W', '_FillValue': -999.}),
+                    'angle_of_incidence': (('row', 'col'), s1_orig['incidence_angle']),
                     "look_direction": (('row', 'col'), s1_orig['look_direction'], {'_FillValue': -999.}),
-                    **denoised_vars,
                 },
                 coords={
-                    "lon": (('row', 'col'), lon_grd),
-                    "lat": (('row', 'col'), lats_grd)
-                }
+                    'longitude': (('row', 'col'), lon_grd),
+                    'latitude': (('row', 'col'), lats_grd)
+                },
+                attrs={"pixel_size": pixel_size}
             )
             s1_dataset.to_netcdf(output_path)
 
@@ -523,11 +516,10 @@ class EnvisatASARSource(SARSource):
         """"""
         return self._nansat.get_metadata()
 
-    def preprocess(self, out_dir, polarizations=('VV',), pixel_size=500):
+    def preprocess(self, out_dir, polarization='VV', pixel_size=500):
         """"""
         output_path = out_dir / f'preprocessed_{self.identifier}.nc'
-        logger.info("Preprocessing %s (%s)",
-                    self.identifier, ','.join(polarizations))
+        logger.info("Preprocessing %s (%s)", self.identifier, polarization)
 
         if output_path.exists():
             logger.info("Preprocessed file already exists: %s", output_path)
@@ -540,15 +532,16 @@ class EnvisatASARSource(SARSource):
 
             s1_dataset = xr.Dataset(
                 data_vars={
-                    "sigma0": (('row', 'col'), self._nansat['sigma0_VV'], {'polarization': 'VV', '_FillValue': -999.}),
+                    "sigma0": (('row', 'col'), self._nansat['sigma0_VV'], {'polarization': polarization, '_FillValue': -999.}),
                     "watermask": (('row', 'col'), watermask[1], {'source': 'MOD44W', '_FillValue': -999.}),
-                    "incidence": (('row', 'col'), self._nansat['incidence_angle']),
+                    'angle_of_incidence': (('row', 'col'), self._nansat['incidence_angle']),
                     "look_direction": (('row', 'col'), self._nansat['look_direction'], {'_FillValue': -999.}),
                 },
                 coords={
-                    "lon": (('row', 'col'), lon_grd),
-                    "lat": (('row', 'col'), lats_grd)
-                }
+                    'longitude': (('row', 'col'), lon_grd),
+                    'latitude': (('row', 'col'), lats_grd)
+                },
+                attrs={"pixel_size": pixel_size}
             )
             s1_dataset.to_netcdf(output_path)
 

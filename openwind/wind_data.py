@@ -223,9 +223,9 @@ class ERA5Source():
                 era5_dataset = era5_dataset.isel(valid_time=0)
 
                 interp_u10 = era5_dataset['u10'].interp(
-                    longitude=s1_dataset.coords['lon'], latitude=s1_dataset.coords['lat'])
+                    longitude=s1_dataset.coords['longitude'], latitude=s1_dataset.coords['latitude'])
                 interp_v10 = era5_dataset['v10'].interp(
-                    longitude=s1_dataset.coords['lon'], latitude=s1_dataset.coords['lat'])
+                    longitude=s1_dataset.coords['longitude'], latitude=s1_dataset.coords['latitude'])
 
                 wind_direction = direction_from(
                     interp_u10.to_masked_array(copy=False),
@@ -245,8 +245,8 @@ class ERA5Source():
                         "speed": (('row', 'col'), wind_speed),
                     },
                     coords={
-                        'lon': s1_dataset.coords['lon'],
-                        'lat': s1_dataset.coords['lat'],
+                        'longitude': s1_dataset.coords['longitude'],
+                        'latitude': s1_dataset.coords['latitude'],
                     }
                 )
                 interp_era5.to_netcdf(out_file)
@@ -400,12 +400,12 @@ class Sentinel1OCNSource():
                         decode_coords='all') as geolocated_wind_speed:
 
                     interp_dir = geolocated_wind_dir.interp(
-                        lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+                        lon=s1_dataset.coords['longitude'], lat=s1_dataset.coords['latitude'])
                     interp_sar_dir = wind2sar_direction(
                         interp_dir['Band1'].to_masked_array(copy=False),
                         s1_dataset['look_direction'].to_masked_array(copy=False))
                     interp_speed = geolocated_wind_speed.interp(
-                        lon=s1_dataset.coords['lon'], lat=s1_dataset.coords['lat'])
+                        lon=s1_dataset.coords['longitude'], lat=s1_dataset.coords['latitude'])
 
                     interp_dataset = xr.Dataset(
                         data_vars={
@@ -414,8 +414,8 @@ class Sentinel1OCNSource():
                             "sar_dir": (('row', 'col'), interp_sar_dir),
                         },
                         coords={
-                            'lon': s1_dataset.coords['lon'],
-                            'lat': s1_dataset.coords['lat'],
+                            'longitude': s1_dataset.coords['longitude'],
+                            'latitude': s1_dataset.coords['latitude'],
                         }
                     )
                     interp_dataset.to_netcdf(out_file)
