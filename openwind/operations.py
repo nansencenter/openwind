@@ -110,7 +110,6 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
              xr.open_dataset(wind_source.interpolated_path, decode_coords='all'
                              ) as interp_wind_dataset:
 
-            wind_dir = interp_wind_dataset['dir'].to_masked_array(copy=False)
             wind_sar_dir = interp_wind_dataset['sar_dir'].to_masked_array(copy=False)
             dimensions = ('time', 'row', 'col')
 
@@ -119,7 +118,6 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
             elif gmf == 'cmod7':
                 gmf_inverse = cmod7.cmod7_inverse
 
-            final_vars = {}
             sar = s1_dataset['sigma0'].to_numpy()
             # do not generate wind speed where the wind direction
             # is not available
@@ -145,8 +143,9 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
                 data_vars={
                     'sea_binary_mask': (dimensions, [s1_dataset['sea_binary_mask'].data]),
                     'angle_of_incidence': (dimensions, [s1_dataset['angle_of_incidence'].data]),
+                    'direction_of_radial_vector_away_from_instrument': (
+                        dimensions, [s1_dataset['look_direction'].data]),
                     'wind_from_direction_model': (dimensions, [interp_wind_dataset['dir'].data]),
-                    # 'wind_sar_direction_model': (dimensions, [interp_wind_dataset['sar_dir'].data]),
                     'wind_speed_model': (dimensions, [interp_wind_dataset['speed'].data]),
                     'sigma0': (dimensions, [s1_dataset['sigma0'].data], s1_dataset['sigma0'].attrs),
                     'wind_speed_sar': (dimensions, [wind_speed]),
