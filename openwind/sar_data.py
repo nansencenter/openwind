@@ -407,7 +407,7 @@ class Sentinel1Source(SARSource):
                 ).astype(np.float32)
         return denoised
 
-    def preprocess(self, out_dir, algorithm='NERSC', polarization='VV', pixel_size=500):
+    def preprocess(self, out_dir, algorithm='ESA', polarization='VV', pixel_size=500):
         """Denoise and resize the dataset. Pixel size in meters.
         """
         output_path = out_dir / f'denoised_{self.identifier}.nc'
