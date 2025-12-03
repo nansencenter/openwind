@@ -1,7 +1,8 @@
 import logging
 import multiprocessing
+import shutil
 from collections.abc import Sequence
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Union, Literal, Generator
@@ -13,6 +14,7 @@ import cartopy.feature.download.__main__
 import matplotlib.pyplot as plt
 import netCDF4
 import numpy as np
+import requests
 import xarray as xr
 
 import openwind.gmf.cmod5n as cmod5n
@@ -297,6 +299,38 @@ def check_sar_input(
     return sar_input_params
 
 
+def make_product_file_name(sar_source: sar_data.SARSource, product_version: str, file_version: str):
+    """Build the name for a final product file"""
+    return (
+        f"{sar_source.platform}_{sar_source.start_time.strftime('%Y%m%d%H%M%S')}"
+        f"_SARWIND_v{product_version}_fv{file_version}.nc")
+
+
+def check_final_file(out_dir: Union[str, Path],
+                     sar_source: sar_data.SARSource,
+                     product_version: str, file_version: str,
+                     remove_invalid: bool = True):
+    """Checks if the product file has already been generated and
+    removes it if invalid
+    """
+    full_path = Path(out_dir, make_product_file_name(sar_source, product_version, file_version))
+    result = False
+    if full_path.is_file():
+        try:
+            netCDF4.Dataset(full_path)
+        except OSError:
+            if remove_invalid:
+                logger.warning("Removing invalid product file: %s", full_path)
+                full_path.unlink()
+            else:
+                logger.error(
+                    "Won't process SAR source, invalid product file already present: %s", full_path)
+        else:
+            logger.info("Product file already exists: %s", full_path)
+            result = full_path
+    return result
+
+
 def create_sar_sources(
         extent: utils.Extent = None,
         time_start: datetime = None,
@@ -329,28 +363,42 @@ def create_sar_sources(
 
 def thread_download(
         downloaded_queue: multiprocessing.Queue,
+        cleanup_queue: multiprocessing.Queue,
         sar_source: sar_data.SARSource,
         wind_source: Union[wind_data.ERA5Source, wind_data.Sentinel1OCNSource],
         input_dir: Path,
-        wind_folder: Path,):
+        wind_folder: Path,
+        cleanup: bool = True):
     """Downloads SAR and wind. Meant to be run in a thread.
     """
-    sar_source.download(input_dir, unzip=True)
+    try:
+        sar_source.download(input_dir, unzip=True)
+    except requests.RequestException:
+        logger.error("Error while downloading %s", sar_source.identifier, exc_info=True)
+        if cleanup:
+            cleanup_queue.put((sar_source, wind_source))
+        return None
+
     try:
         wind_source.download(wind_folder)
     except RuntimeError:
         logger.warning("No wind data found matching %s", sar_source.identifier)
+        if cleanup:
+            cleanup_queue.put((sar_source, wind_source))
         return None
+
     downloaded_queue.put((sar_source, wind_source))
 
 
 def multiprocess_preprocess(
         downloaded_queue: multiprocessing.Queue,
         preprocessed_queue: multiprocessing.Queue,
+        cleanup_queue: multiprocessing.Queue,
         denoised_dir: Path,
         polarization: str,
         wind_folder: Path,
-        pixel_size: int = 500):
+        pixel_size: int = 500,
+        cleanup: bool = True):
     """Preprocess SAR (denoise, resize) and wind data (interpolate),
     then generate the full dataset.
     Meant to be run in a separate process
@@ -368,16 +416,21 @@ def multiprocess_preprocess(
             preprocessed_queue.put((sar_source, wind_source))
         except Exception:
             logger.error("Error during preprocessing of %s", sar_source.identifier, exc_info=True)
+            if cleanup:
+                cleanup_queue.put((sar_source, wind_source))
 
 
 def multiprocess_make_dataset(
         preprocessed_queue: multiprocessing.Queue,
         processed_queue: multiprocessing.Queue,
+        cleanup_queue: multiprocessing.Queue,
         output_dir: Path,
         gmf: str,
         iterations: int,
         product_version: str = '1.0',
-        file_version: str = '1.0'):
+        file_version: str = '1.0',
+        cleanup: bool = True,
+        plot: bool = False):
     """Create the full dataset. Meant to be run in a separate process
     """
     logger.debug("Starting dataset making process")
@@ -391,14 +444,17 @@ def multiprocess_make_dataset(
             full_dataset_path = make_full_dataset(
                 sar_source=sar_source, wind_source=wind_source,
                 out_dir=output_dir,
-                full_ds_file_name=(
-                    f"{sar_source.platform}_{sar_source.start_time.strftime('%Y%m%d%H%M%S')}"
-                    f"_SARWIND_v{product_version}_fv{file_version}.nc"),
+                full_ds_file_name=make_product_file_name(sar_source, product_version, file_version),
                 gmf=gmf, iterations=iterations)
-            processed_queue.put((sar_source, wind_source, full_dataset_path))
+            if plot:
+                processed_queue.put((sar_source, wind_source, full_dataset_path))
+            elif cleanup:
+                cleanup_queue.put((sar_source, wind_source))
         except Exception:
             logger.error("Error during dataset creation for %s",
                          sar_source.identifier, exc_info=True)
+            if cleanup:
+                cleanup_queue.put((sar_source, wind_source))
 
 
 def multiprocess_plot_dataset(
@@ -417,6 +473,36 @@ def multiprocess_plot_dataset(
             plot_full_dataset(sar_source, wind_source, full_dataset_path, plot_dir)
         except Exception:
             logger.error("Error during plotting of %s", sar_source.identifier, exc_info=True)
+
+
+def multiprocess_cleanup(cleanup_queue: multiprocessing.Queue):
+    """Cleanup input and intermediary files after processing"""
+    logger.debug("Starting cleanup process")
+    while True:
+        next_item = cleanup_queue.get()
+        if next_item is Done:
+            logger.debug("Stopping plotting process")
+            break
+        sar_source, wind_source = next_item
+        logger.info("Deleting temporary files for %s", sar_source.identifier)
+        to_delete: tuple[Path] = (
+            sar_source.data_path,
+            sar_source.data_path.parent / f"{sar_source.data_path.stem}.zip",
+            sar_source.preprocessed_path,
+            wind_source.data_path,
+            wind_source.interpolated_path,
+        )
+        for p in to_delete:
+            if p:
+                logger.debug("Deleting %s", p)
+                try:
+                    p.unlink()
+                except IsADirectoryError:
+                    shutil.rmtree(p)
+                except FileNotFoundError as e:
+                    logger.debug("File does not exist, can't remove: %s", e.filename)
+                except Exception:
+                    logger.error("Error while deleting %s", p, exc_info=True)
 
 
 def stop_processes(processes: dict, timeout: int = 1800):
@@ -446,6 +532,7 @@ def generate_product(
         gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n',
         iterations: int = 10,
         plot: bool = False,
+        cleanup: bool = True,
         workdir: Union[str, Path] = Path('.'),
         input_dir: Union[str, Path] = None,
         output_dir: Union[str, Path] = None,
@@ -456,7 +543,9 @@ def generate_product(
         max_preprocess_workers: int = 5,
         max_process_workers: int = 10,
         max_plot_workers: int = 5,
-        pixel_size: int = 500):
+        pixel_size: int = 500,
+        product_version: str = '1.0',
+        file_version: str = '1.0'):
     """Generate a full data product for the specified time and space extents"""
     sar_input_params = check_sar_input(extent, time_start, time_end, s1_identifiers, sar_files)
 
@@ -476,40 +565,70 @@ def generate_product(
         s1_identifiers,
         sar_files, sar_source_class)
 
-
     downloaded_queue = multiprocessing.Queue()
     preprocessed_queue = multiprocessing.Queue()
     processed_queue = multiprocessing.Queue()
+    cleanup_queue = multiprocessing.Queue()
 
     processes = {
         'preprocess': {
             'input_queue': downloaded_queue,
             'workers': max_preprocess_workers,
             'function': multiprocess_preprocess,
-            'args': (
-                downloaded_queue, preprocessed_queue,
-                denoised_dir, 'VV', wind_folder,
-                pixel_size),
+            'kwargs': {
+                "downloaded_queue": downloaded_queue,
+                "preprocessed_queue": preprocessed_queue,
+                "cleanup_queue": cleanup_queue,
+                "denoised_dir": denoised_dir,
+                "polarization": 'VV',
+                "wind_folder": wind_folder,
+                "pixel_size": pixel_size,
+                "cleanup": True,
+            },
             'processes': [],
         },
         'process': {
             'input_queue': preprocessed_queue,
             'workers': max_process_workers,
             'function': multiprocess_make_dataset,
-            'args': (preprocessed_queue, processed_queue, output_dir, gmf, iterations),
+            'kwargs': {
+                "preprocessed_queue": preprocessed_queue,
+                "processed_queue": processed_queue,
+                "cleanup_queue": cleanup_queue,
+                "output_dir": output_dir,
+                "gmf": gmf,
+                "iterations": iterations,
+                "product_version": product_version,
+                "file_version": file_version,
+                "cleanup": True,
+                "plot": False,
+            },
             'processes': [],
         },
     }
+
     if plot:
         processes['plot'] = {
             'input_queue': processed_queue,
             'workers': max_plot_workers,
             'function': multiprocess_plot_dataset,
-            'args': (processed_queue, plot_dir),
+            'kwargs': {
+                "processed_queue": processed_queue,
+                "plot_dir": plot_dir,
+            },
             'processes': [],
         }
         # download coastlines
         cartopy.feature.download.__main__.download_features(['physical'])
+
+    if cleanup:
+        processes['cleanup'] = {
+            'input_queue': cleanup_queue,
+            'workers': 1,
+            'function': multiprocess_cleanup,
+            'kwargs': {"cleanup_queue": cleanup_queue},
+            'processes': [],
+        }
 
     with ThreadPoolExecutor(max_workers=max_download_workers) as download_executor:
         download_futures = []
@@ -519,18 +638,30 @@ def generate_product(
             for process_config in processes.values():
                 for _ in range(process_config['workers']):
                     p = multiprocessing.Process(
-                            target=process_config['function'],
-                            args=process_config['args'])
+                        target=process_config['function'],
+                        kwargs=process_config['kwargs'])
                     process_config['processes'].append(p)
                     p.start()
 
             # download SAR and wind, starting the processing chain
             for sar_source in sar_sources:
+                full_path = check_final_file(
+                    out_dir=output_dir,
+                    sar_source=sar_source,
+                    product_version=product_version,
+                    file_version=file_version,
+                    remove_invalid=True)
+                if full_path:
+                    continue
+
                 wind_source = wind_source_class(sar_source)
                 download_futures.append(download_executor.submit(
                     thread_download,
-                    downloaded_queue,
-                    sar_source, wind_source, input_dir, wind_folder))
+                    downloaded_queue=downloaded_queue,
+                    cleanup_queue=cleanup_queue,
+                    sar_source=sar_source, wind_source=wind_source,
+                    input_dir=input_dir, wind_folder=wind_folder,
+                    cleanup=cleanup))
 
             for download_future in as_completed(download_futures):
                 try:
