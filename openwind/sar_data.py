@@ -373,7 +373,12 @@ class Sentinel1Source(SARSource):
         if not safe_path.exists() and zipfile.is_zipfile(self.data_path):
             logger.info("Unzipping %s", self.data_path)
             with zipfile.ZipFile(self.data_path) as zip_file:
-                if safe_name in zip_file.namelist():
+                found = False
+                for name in zip_file.namelist():
+                    if safe_name in name:
+                        found = True
+                        break
+                if found:
                     zip_file.extractall(out_dir)
                 else:
                     raise RuntimeError(f"Not a Sentinel-1 SAFE archive: {self.data_path}")
