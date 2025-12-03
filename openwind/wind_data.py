@@ -196,7 +196,7 @@ class ERA5Source():
         return self.product
 
     def download(self, out_dir: Union[str, Path]):
-        """"""
+        """Download the product file to `out_dir`"""
         era5_file = Path(out_dir, f'ERA5_{self.sar_source.identifier}.nc')
         if era5_file.exists():
             logger.info("Did not download, destination already exists: %s", era5_file)
