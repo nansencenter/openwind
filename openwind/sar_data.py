@@ -458,12 +458,27 @@ class Sentinel1Source(SARSource):
         self.preprocessed_path = output_path
         return output_path
 
+    def get_product_metadata(self):
+        return {
+            'platform': '{"Category": "Earth Observation Satellites", "Series_Entity": "SENTINEL-1", "Short_Name": "SENTINEL-1A", "Long_Name": "SENTINEL-1A"}',
+            'BEAM_MODE': self.properties['beamModeType'],
+            'BEAM_SWATH': self.properties['beamModeType'],
+            'SWATH': self.properties['beamModeType'],
+            'MISSION_ID': self.properties['fileID'].split('_')[0],
+            'MODE': self.properties['beamModeType'],
+            'ORBIT_DIRECTION': self.properties['flightDirection'],
+            'ORBIT_NUMBER': self.properties['orbit'],
+            'polarisation': self.properties['polarization'],
+            'PRODUCT_TYPE': self.properties['processingLevel'],
+            'SATELLITE_IDENTIFIER': self.properties['platform'][:-1],
+            'SENSOR_IDENTIFIER': self.properties['sensor'],
+        }
+
 
 class EnvisatASARSource(SARSource):
     """"""
     def __init__(self, data_path: Path):
         self.data_path = data_path
-        self._nansat = Nansat(str(self.data_path))
 
         self.preprocessed_path = None
         self._bounding_box = None
@@ -488,7 +503,7 @@ class EnvisatASARSource(SARSource):
     def bounding_box(self):
         """"""
         if self._bounding_box is None:
-            corners_lons, corners_lats = self._nansat.get_corners()
+            corners_lons, corners_lats = Nansat(str(self.data_path)).get_corners()
             min_lon = 180.
             max_lon = -180.
             min_lat = 90.
@@ -519,7 +534,9 @@ class EnvisatASARSource(SARSource):
     @property
     def properties(self):
         """"""
-        return self._nansat.get_metadata()
+        if self._properties is None:
+            self._properties = Nansat(str(self.data_path)).get_metadata()
+        return self._properties
 
     def preprocess(self, out_dir, polarization='VV', pixel_size=500):
         """"""
@@ -531,16 +548,18 @@ class EnvisatASARSource(SARSource):
         else:
             logger.info(f'Writing preprocessed dataset at {output_path}...')
 
-            self._nansat.resize(pixelsize=pixel_size, resample_alg=0)
-            lon_grd, lats_grd = self._nansat.get_geolocation_grids()
-            watermask = self._nansat.watermask()
+            nansat_ds = Nansat(str(self.data_path))
+
+            nansat_ds.resize(pixelsize=pixel_size, resample_alg=0)
+            lon_grd, lats_grd = nansat_ds.get_geolocation_grids()
+            watermask = nansat_ds.watermask()
 
             s1_dataset = xr.Dataset(
                 data_vars={
-                    "sigma0": (('row', 'col'), self._nansat['sigma0_VV'], {'polarization': polarization, '_FillValue': -999.}),
-                    "watermask": (('row', 'col'), watermask[1], {'source': 'MOD44W', '_FillValue': -999.}),
-                    'angle_of_incidence': (('row', 'col'), self._nansat['incidence_angle']),
-                    "look_direction": (('row', 'col'), self._nansat['look_direction'], {'_FillValue': -999.}),
+                    "sigma0": (('row', 'col'), nansat_ds['sigma0_VV'], {'polarization': polarization, '_FillValue': -999.}),
+                    "sea_binary_mask": (('row', 'col'), watermask[1], {'source': 'MOD44W', '_FillValue': -999.}),
+                    'angle_of_incidence': (('row', 'col'), nansat_ds['incidence_angle']),
+                    "look_direction": (('row', 'col'), nansat_ds['look_direction'], {'_FillValue': -999.}),
                 },
                 coords={
                     'longitude': (('row', 'col'), lon_grd),
@@ -552,3 +571,8 @@ class EnvisatASARSource(SARSource):
 
         self.preprocessed_path = output_path
         return output_path
+
+    def get_product_metadata(self):
+        return {
+            'platform': self.properties['platform'],
+        }

@@ -55,26 +55,14 @@ def make_metadata(sar_source:sar_data.SARSource,
         'southernmost_latitude': extent.south,
         'westernmost_longitude': extent.west,
         'easternmost_longitude': extent.east,
-        'BEAM_MODE': sar_source.properties['beamModeType'],
-        'BEAM_SWATH': sar_source.properties['beamModeType'],
-        'SWATH': sar_source.properties['beamModeType'],
         'data_center': "Nansen Environmental and Remote Sensing Centre",
         'title': f'Wind field from {sar_source.identifier}',
         'instrument': 'SAR (Synthetic Aperture Radar)',
         'ISO_topic_category': 'Imagery/Base Maps/Earth Cover',
         'keywords': "['Earth Science', 'Spectral/Engineering', 'RADAR', 'RADAR backscatter'], ['Earth Science', 'Spectral/Engineering', 'RADAR', 'RADAR imagery'], ['Earth Science', 'Spectral/Engineering', 'Microwave', 'Microwave Imagery'], ['EARTH SCIENCE', 'ATMOSPHERE', 'ATMOSPHERIC WINDS', 'SURFACE WINDS', 'U/V WIND COMPONENTS']",
         'keywords_vocabulary': 'GCMD Science Keywords',
-        'MISSION_ID': sar_source.properties['fileID'].split('_')[0],
-        'MODE': sar_source.properties['beamModeType'],
         'netcdf4_version_id': netCDF4.getlibversion().split()[0],
-        'ORBIT_DIRECTION': sar_source.properties['flightDirection'],
-        'ORBIT_NUMBER': sar_source.properties['orbit'],
-        'platform': '{"Category": "Earth Observation Satellites", "Series_Entity": "SENTINEL-1", "Short_Name": "SENTINEL-1A", "Long_Name": "SENTINEL-1A"}',
-        'polarisation': sar_source.properties['polarization'],
         'ProductTimelinessCategory': 'NTC',
-        'PRODUCT_TYPE': sar_source.properties['processingLevel'],
-        'SATELLITE_IDENTIFIER': sar_source.properties['platform'][:-1],
-        'SENSOR_IDENTIFIER': sar_source.properties['sensor'],
         'summary': (
             f'Near surface (10m) wind from SAR ({sar_source.platform}) and {wind_model} wind model,'
             ' computed using the {gmf.upper()} GMF (https://scatterometer.knmi.nl/). This product '
@@ -85,7 +73,8 @@ def make_metadata(sar_source:sar_data.SARSource,
         'winddir_time': wind_time.astimezone(timezone.utc).isoformat(),
         'WIND_DIRECTION_SOURCE': wind_model,
         'project': 'C3-eKerala',
-        'pixel_size': f"{pixel_size}m"
+        'pixel_size': f"{pixel_size}m",
+        **sar_source.get_product_metadata()
     }
 
 
@@ -371,13 +360,14 @@ def thread_download(
         cleanup: bool = True):
     """Downloads SAR and wind. Meant to be run in a thread.
     """
-    try:
-        sar_source.download(input_dir, unzip=True)
-    except requests.RequestException:
-        logger.error("Error while downloading %s", sar_source.identifier, exc_info=True)
-        if cleanup:
-            cleanup_queue.put((sar_source, wind_source))
-        return None
+    if sar_source.data_path is None:
+        try:
+            sar_source.download(input_dir, unzip=True)
+        except requests.RequestException:
+            logger.error("Error while downloading %s", sar_source.identifier, exc_info=True)
+            if cleanup:
+                cleanup_queue.put((sar_source, wind_source))
+            return None
 
     try:
         wind_source.download(wind_folder)
@@ -600,8 +590,8 @@ def generate_product(
                 "iterations": iterations,
                 "product_version": product_version,
                 "file_version": file_version,
-                "cleanup": True,
-                "plot": False,
+                "cleanup": cleanup,
+                "plot": plot,
             },
             'processes': [],
         },
@@ -651,7 +641,7 @@ def generate_product(
                     product_version=product_version,
                     file_version=file_version,
                     remove_invalid=True)
-                if full_path:
+                if full_path and not plot:
                     continue
 
                 wind_source = wind_source_class(sar_source)
