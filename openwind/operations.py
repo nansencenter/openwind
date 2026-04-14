@@ -81,7 +81,8 @@ def make_metadata(sar_source:sar_data.SARSource,
 def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA5Source,
                       out_dir: Path,
                       full_ds_file_name: str = None,
-                      gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n', iterations: int = 10):
+                      gmf: Literal['cmod5.n', 'cmod7'] = 'cmod5.n', iterations: int = 10,
+                      mask_land: bool = False):
     """Generate the full dataset, which includes:
         - the original SAR data (sigma0, incidence angle, watermask)
         - the denoised SAR data (sigma0) if applicable
@@ -113,6 +114,8 @@ def make_full_dataset(sar_source: sar_data.SARSource, wind_source: wind_data.ERA
             # do not generate wind speed where the wind direction
             # is not available
             sar[wind_sar_dir.mask] = np.nan
+            if mask_land:
+                sar[s1_dataset['sea_binary_mask'].data == 2.] = np.nan
             wind_speed = gmf_inverse(
                 sar,
                 wind_sar_dir,
