@@ -252,19 +252,20 @@ class Sentinel1Source(SARSource):
 
     @classmethod
     def from_asf(cls,
-                 extent: Extent, time_start: datetime, time_end: datetime,
+                 extent: Extent = None, time_start: datetime = None, time_end: datetime = None,
                  query:dict = None):
         """"""
-        polygon = ("POLYGON(("
-            f"{extent.west} {extent.south},"
-            f"{extent.east} {extent.south},"
-            f"{extent.east} {extent.north},"
-            f"{extent.west} {extent.north},"
-            f"{extent.west} {extent.south}))")
-
-        date_format = '%Y-%m-%dT%H:%M:%SZ'
 
         if query is None:
+            polygon = ("POLYGON(("
+                f"{extent.west} {extent.south},"
+                f"{extent.east} {extent.south},"
+                f"{extent.east} {extent.north},"
+                f"{extent.west} {extent.north},"
+                f"{extent.west} {extent.south}))")
+
+            date_format = '%Y-%m-%dT%H:%M:%SZ'
+
             query = {
                 'platform': asf.PLATFORM.SENTINEL1,
                 'start': time_start.strftime(date_format),
@@ -273,6 +274,7 @@ class Sentinel1Source(SARSource):
                 'processingLevel': asf.PRODUCT_TYPE.GRD_HD,
                 'intersectsWith': polygon,
             }
+
         query_set = asf.search(**query)
         for asf_product in query_set:
             yield cls(asf_product=asf_product)
