@@ -239,9 +239,7 @@ class SARSource():
 
 class Sentinel1Source(SARSource):
     """"""
-    def __init__(self,
-                 data_path:Union[str, Path] = None,
-                 asf_product: asf.ASFProduct = None):
+    def __init__(self, data_path: Union[str, Path] = None, asf_product: asf.ASFProduct = None):
         self._asf_product = asf_product
         self.data_path = Path(data_path) if data_path is not None else None
         self.preprocessed_path = None
