@@ -144,15 +144,41 @@ def preprocess_wind_data(
     return wind_spd, wind_dir
 
 
-class ERA5Source():
-    """Class used to manage an ERA5 wind source"""
-    model_name = 'ERA5'
+class WindSource():
+    """Base class for wind sources"""
+    model_name = None
 
     def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
         self.sar_source = sar_source
         self.product = None
         self.data_path = data_path
         self.interpolated_path = None
+
+    def get_time(self):
+        raise NotImplementedError()
+
+    def find_product(self, bbox_expansion: float = .1):
+        """Find a product which matches the coverage of the SAR source
+        """
+        raise NotImplementedError()
+
+    def download(self, out_dir: Union[str, Path]):
+        """Download the product file to `out_dir`"""
+        raise NotImplementedError()
+
+    def interpolate_on_sar_grid(self, out_dir: Path):
+        """Interpolate the model wind speed and direction on the
+        preprocessed SAR data grid
+        """
+        raise NotImplementedError()
+
+
+class ERA5Source(WindSource):
+    """Class used to manage an ERA5 wind source"""
+    model_name = 'ERA5'
+
+    def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
+        super().__init__(sar_source, data_path)
         self._time = None
 
     def get_time(self):
@@ -164,9 +190,6 @@ class ERA5Source():
         return self._time
 
     def find_product(self, bbox_expansion: float = .1) -> cdsapi.api.Result:
-        """Find a product from the API which matches the coverage of
-        the SAR source
-        """
         logger.info("Looking for ERA5 dataset fitting %s", self.sar_source.identifier)
         west, east, south, north = self.sar_source.bounding_box
         west -= bbox_expansion
@@ -196,7 +219,6 @@ class ERA5Source():
         return self.product
 
     def download(self, out_dir: Union[str, Path]):
-        """Download the product file to `out_dir`"""
         era5_file = Path(out_dir, f'ERA5_{self.sar_source.identifier}.nc')
         if era5_file.exists():
             logger.info("Did not download, destination already exists: %s", era5_file)
@@ -223,9 +245,11 @@ class ERA5Source():
                 era5_dataset = era5_dataset.isel(valid_time=0)
 
                 interp_u10 = era5_dataset['u10'].interp(
-                    longitude=s1_dataset.coords['longitude'], latitude=s1_dataset.coords['latitude'])
+                    longitude=s1_dataset.coords['longitude'],
+                    latitude=s1_dataset.coords['latitude'])
                 interp_v10 = era5_dataset['v10'].interp(
-                    longitude=s1_dataset.coords['longitude'], latitude=s1_dataset.coords['latitude'])
+                    longitude=s1_dataset.coords['longitude'],
+                    latitude=s1_dataset.coords['latitude'])
 
                 wind_direction = direction_from(
                     interp_u10.to_masked_array(copy=False),
@@ -254,19 +278,12 @@ class ERA5Source():
         return out_file
 
 
-class Sentinel1OCNSource():
+class Sentinel1OCNSource(WindSource):
     """Wind model data source using ECMWF from Sentinel-1 OCN datasets
     """
     model_name = 'ECMWF'
 
-    def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
-        self.sar_source = sar_source
-        self.product = None
-        self.data_path = data_path
-        self.interpolated_path = None
-
     def find_product(self, bbox_expansion: float = .1):
-        """Find an ASF product matching the SAR source"""
         s1_shape = self.sar_source.get_shape()
 
         query = {
@@ -315,9 +332,6 @@ class Sentinel1OCNSource():
         return datetime.fromisoformat(self.properties['startTime'])
 
     def download(self, out_dir: Union[str, Path]):
-        """Download the ASF product. If no product has been found yet,
-        try to find one.
-        """
         if self.product is None:
             self.find_product()
         target = Path(out_dir, self.product.properties['fileName'])
@@ -375,9 +389,6 @@ class Sentinel1OCNSource():
         return warped_dir
 
     def interpolate_on_sar_grid(self, out_dir: Path):
-        """Interpolate the model wind speed and direction on the
-        preprocessed SAR data grid
-        """
         denoised_s1_file = self.sar_source.preprocessed_path
         uid = re.match(r'^S1.*_([A-Z0-9]{4})$', self.identifier).group(1)
         out_file = out_dir / f'interp_{self.data_path.stem}_{uid}.nc'
@@ -423,3 +434,251 @@ class Sentinel1OCNSource():
 
             self.interpolated_path = out_file
             return out_file
+
+
+class MEPSSource(WindSource):
+    """Class used to manage a MEPS wind source"""
+    model_name = 'MEPS'
+
+    def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
+        super().__init__(sar_source, data_path)
+        self._time = None
+
+    def _get_wind_time_index(self):
+        """Get the time of the wind model matching the SAR data
+        """
+        sar_date = np.datetime64(self.sar_source.start_time.isoformat())
+        result = None
+        with xr.open_dataset(self.data_path) as d:
+            for i, t in enumerate(d.coords['time'].data):
+                if t >= sar_date:
+                    break
+            result = i - 1
+            self._time = datetime.fromisoformat(d.coords['time'].data[result].astype(str))
+        return result
+
+    def get_time(self):
+        """Get the dataset time from the data"""
+        if self._time is None:
+            self._get_wind_time_index()
+        return self._time
+
+    @staticmethod
+    def lcc_grid_convergence_angle(longitude, central_meridian=-25., central_latitude=77.5):
+        """Calculate grid convergence angle for the Lambert Conic Conformal (LCC)
+        projection
+
+        Parameters
+        ----------
+        longitude: float
+            Longitude of the grid point from the LCC domain
+        central_meridian: float
+            Central meridial of the LCC grid projection
+        central_latitude: float
+            Standard parallel of the LCC grid projection
+
+        Returns
+        ------
+        azimuth: float
+            Deviation of the LCC domain from the true north
+        """
+        azimuth = np.sin(np.deg2rad(central_latitude)) * (longitude - central_meridian)
+        return azimuth
+
+    def calculate_grid_convergence_angle(self, meps_dataset):
+        meps_grid_convergence_angle = self.lcc_grid_convergence_angle(
+            longitude=meps_dataset['longitude'][:].data,
+            central_meridian=meps_dataset['projection_lambert'].longitude_of_central_meridian,
+            central_latitude=meps_dataset['projection_lambert'].latitude_of_projection_origin)
+        return meps_grid_convergence_angle
+
+    @staticmethod
+    def calculate_wind_magnitude(u, v):
+        """Calculate wind speed from the components
+        Parameters
+        ----------
+
+        u: float
+            Eastward wind component in m/s
+        v: float
+            Northward wind component in m/s
+
+        Returns
+        -------
+        float: Return wind speed
+        """
+
+        return np.hypot(u, v)
+
+    @staticmethod
+    def calculate_wind_direction(u, v):
+        """Estimate wind direction from components. Meteo convention
+
+        Parameters
+        ----------
+        u: float
+            Eastward wind component in m/s
+        v: float
+            Northward wind component in m/s
+
+        Returns
+        -------
+        float: Return wind direction in degrees
+        """
+        direction = (-np.rad2deg(np.arctan2(v, u)) - 90)
+        direction[direction < 0] += 360
+        return direction
+
+    @staticmethod
+    def get_uv_wind_components(magnitude, direction):
+        """Decompose wind vector for the eastwards and northwards components
+
+        Parameters
+        ----------
+        magnitude: float
+            Wind speed in m/s
+        direction: float
+            Wind direction in degrees
+
+        Returns
+        -------
+        u, v: float
+            eastward and northward wind components
+        """
+        u = magnitude * np.cos(np.deg2rad(-direction - 90))
+        v = magnitude * np.sin(np.deg2rad(-direction - 90))
+        return u, v
+
+    def extract_true_north_wind(self, meps_dataset, forecast_id, ensemble_mean=False, deterministic=False):
+        # Extract x anb y wind at 10 m height components
+        y_10m_wind = meps_dataset['y_wind_10m'][forecast_id, 0, :, :].data
+        x_10m_wind = meps_dataset['x_wind_10m'][forecast_id, 0, :, :].data
+
+        if ensemble_mean:
+            # Average wind over all ensemble members
+            y_10m_wind = np.nanmean(y_10m_wind, axis=0)#[::-1]
+            x_10m_wind = np.nanmean(x_10m_wind, axis=0)#[::-1]
+
+        elif deterministic:
+            # Select only first ensemble member
+            y_10m_wind = y_10m_wind[:, :]#[::-1]
+            x_10m_wind = x_10m_wind[:, :]#[::-1]
+        else:
+            raise ValueError
+
+        # Process wind parameters from the x and y components
+        # 1. Calculate wind speed and direction from the components
+        wind_speed = self.calculate_wind_magnitude(x_10m_wind, y_10m_wind)
+        wind_direction = self.calculate_wind_direction(x_10m_wind, y_10m_wind)
+
+        # 2. compensate on grid angle deviation from true north
+        grid_convergence_angle = self.calculate_grid_convergence_angle(meps_dataset)
+        wind_direction = (wind_direction + grid_convergence_angle) % 360
+
+        # 3. retrieve u and v component
+        u, v = self.get_uv_wind_components(wind_speed, wind_direction)
+
+        return wind_speed, wind_direction, u, v
+
+    def preprocess_wind(self, out_dir):
+        out_file = out_dir / f"true_north_{self.data_path.stem}_{re.match('.*_([^_]+)$', self.sar_source.identifier).group(1)}{self.data_path.suffix}"
+        if out_file.exists():
+            logger.info("True north file already exists: %s", out_file)
+        else:
+            with xr.open_dataset(self.data_path) as d:
+                # find relevant time
+                wind_speed, wind_direction, u, v = self.extract_true_north_wind(
+                    d, self._get_wind_time_index(), deterministic=True)
+                xr.Dataset(
+                    data_vars={
+                        'wind_speed': (('y', 'x'), wind_speed),
+                        'wind_direction': (('y', 'x'), wind_direction),
+                        'u10': (('y', 'x'), u),
+                        'v10': (('y', 'x'), v),
+                    },
+                    coords={
+                        'y': d['y'],
+                        'x': d['x'],
+                        'longitude': d['longitude'],
+                        'latitude': d['latitude']
+                    },
+                    attrs=d.attrs,
+                ).to_netcdf(out_file)
+        return out_file
+
+    def geolocate(self, file_path) -> list[Path]:
+        """Create a new file containing the selected variable on a grid
+        geolocated with a geotransform
+        """
+        with xr.open_dataset(file_path, decode_coords='all') as dataset:
+            lines, pixels = dataset.sizes['y'], dataset.sizes['x']
+            gcps_line_spacing = lines // 20
+            gcps_pixel_spacing = pixels // 20
+            # get gcps, including the 4 corners
+            gcps = [
+                gdal.GCP(float(dataset.coords['longitude'][i, j]),
+                         float(dataset.coords['latitude'][i, j]), 0., j, i)
+                for i in [*range(0, lines, gcps_line_spacing), lines - 1]
+                for j in [*range(0, pixels, gcps_pixel_spacing), pixels - 1]
+            ]
+        results = []
+        for v in ('wind_speed', 'wind_direction', 'u10', 'v10'):
+            translated_dir = f'/vsimem/{file_path.stem}_{v}.tiff'
+            warped_file = file_path.parent / f'warped_{file_path.stem}_{v}.nc'
+            if warped_file.exists():
+                logger.info("Warped file already exists: %s", warped_file)
+            else:
+                d = gdal.Open(f"NETCDF:{file_path}:{v}")
+                gdal.Translate(
+                    str(translated_dir),
+                    d,
+                    GCPs=gcps,
+                    outputSRS='epsg:4326')
+                gdal.Warp(
+                    str(warped_file),
+                    str(translated_dir),
+                    dstSRS='epsg:4326')
+            results.append(warped_file)
+        return results
+
+    def interpolate_on_sar_grid(self, out_dir: Path):
+        denoised_s1_file = self.sar_source.preprocessed_path
+        out_file = out_dir / f"interp_{self.data_path.stem}_{re.match('.*_([^_]+)$', self.sar_source.identifier).group(1)}{self.data_path.suffix}"
+        logger.info("Interpolating %s on the grid of %s. Writing to %s",
+                    self.data_path.name, denoised_s1_file, out_file)
+        true_north_path = self.preprocess_wind(out_dir)
+        geolocated_paths = self.geolocate(true_north_path)
+        if out_file.exists():
+            logger.info("Interpolated file already exists at %s, skipping", out_file)
+        else:
+
+            with xr.open_dataset(denoised_s1_file, decode_coords='all') as s1_dataset:
+                data_vars = {}
+                for wp in geolocated_paths:
+                    if 'wind_speed' in str(wp):
+                        var_name = 'speed'
+                    elif 'wind_direction' in str(wp):
+                        var_name = 'dir'
+                    else:
+                        var_name = re.match('^.*_([^_]+).nc$', str(wp)).group(1)
+
+                    with xr.open_dataset(wp, decode_coords='all') as var_dataset:
+                        interp = var_dataset['Band1'].interp(
+                            lon=s1_dataset.coords['longitude'],
+                            lat=s1_dataset.coords['latitude'])
+                        data_vars[var_name] = (('row', 'col'), interp.data)
+
+                wind_sar_direction = wind2sar_direction(
+                    data_vars['dir'][1],
+                    s1_dataset['look_direction'].to_masked_array(copy=False))
+                data_vars['sar_dir'] = (('row', 'col'), wind_sar_direction)
+
+                xr.Dataset(
+                    data_vars=data_vars,
+                    coords={
+                        'longitude': s1_dataset.coords['longitude'],
+                        'latitude': s1_dataset.coords['latitude']
+                    }
+                ).to_netcdf(out_file)
+        self.interpolated_path = out_file
+        return out_file
