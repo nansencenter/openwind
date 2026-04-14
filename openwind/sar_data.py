@@ -414,7 +414,8 @@ class Sentinel1Source(SARSource):
                 ).astype(np.float32)
         return denoised
 
-    def preprocess(self, out_dir, algorithm='ESA', polarization='VV', pixel_size=500):
+    def preprocess(self, out_dir, algorithm='ESA', polarization='VV',
+                   pixel_size=500, extent=None):
         """Denoise and resize the dataset. Pixel size in meters.
         """
         output_path = out_dir / f'denoised_{self.identifier}.nc'
@@ -435,10 +436,12 @@ class Sentinel1Source(SARSource):
                 'polarization': polarization,
             })
 
-            s1_orig.resize(pixelsize=pixel_size, resample_alg=0)
+            if extent is not None:
+                s1_orig.crop_lonlat((extent.west, extent.east), (extent.south, extent.north))
+            if pixel_size is not None:
+                s1_orig.resize(pixelsize=pixel_size, resample_alg=0)
             lon_grd, lats_grd = s1_orig.get_geolocation_grids()
             watermask = s1_orig.watermask()
-
             s1_dataset = xr.Dataset(
                 data_vars={
                     "sigma0": (
@@ -453,7 +456,7 @@ class Sentinel1Source(SARSource):
                     'longitude': (('row', 'col'), lon_grd),
                     'latitude': (('row', 'col'), lats_grd)
                 },
-                attrs={"pixel_size": pixel_size}
+                attrs={"pixel_size": pixel_size if pixel_size is not None else ''}
             )
             s1_dataset.to_netcdf(output_path)
 
