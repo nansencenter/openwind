@@ -397,21 +397,24 @@ def multiprocess_preprocess(
     then generate the full dataset.
     Meant to be run in a separate process
     """
-    logger.debug("Starting preprocessing process")
-    while True:
-        next_item = downloaded_queue.get()
-        if next_item is Done:
-            logger.debug("Stopping preprocessing process")
-            break
-        sar_source, wind_source = next_item
-        try:
-            sar_source.preprocess(denoised_dir, polarization=polarization, pixel_size=pixel_size)
-            wind_source.interpolate_on_sar_grid(wind_folder)
-            preprocessed_queue.put((sar_source, wind_source))
-        except Exception:
-            logger.error("Error during preprocessing of %s", sar_source.identifier, exc_info=True)
-            if cleanup:
-                cleanup_queue.put((sar_source, wind_source))
+    try:
+        logger.debug("Starting preprocessing process")
+        while True:
+            next_item = downloaded_queue.get()
+            if next_item is Done:
+                logger.debug("Stopping preprocessing process")
+                break
+            sar_source, wind_source = next_item
+            try:
+                sar_source.preprocess(denoised_dir, polarization=polarization, pixel_size=pixel_size)
+                wind_source.interpolate_on_sar_grid(wind_folder)
+                preprocessed_queue.put((sar_source, wind_source))
+            except Exception:
+                logger.error("Error during preprocessing of %s", sar_source.identifier, exc_info=True)
+                if cleanup:
+                    cleanup_queue.put((sar_source, wind_source))
+    except:
+        logger.error("Error in preprocessing process", exc_info=True)
 
 
 def multiprocess_make_dataset(
@@ -427,28 +430,31 @@ def multiprocess_make_dataset(
         plot: bool = False):
     """Create the full dataset. Meant to be run in a separate process
     """
-    logger.debug("Starting dataset making process")
-    while True:
-        next_item = preprocessed_queue.get()
-        if next_item is Done:
-            logger.debug("Stopping dataset making process")
-            break
-        sar_source, wind_source = next_item
-        try:
-            full_dataset_path = make_full_dataset(
-                sar_source=sar_source, wind_source=wind_source,
-                out_dir=output_dir,
-                full_ds_file_name=make_product_file_name(sar_source, product_version, file_version),
-                gmf=gmf, iterations=iterations)
-            if plot:
-                processed_queue.put((sar_source, wind_source, full_dataset_path))
-            elif cleanup:
-                cleanup_queue.put((sar_source, wind_source))
-        except Exception:
-            logger.error("Error during dataset creation for %s",
-                         sar_source.identifier, exc_info=True)
-            if cleanup:
-                cleanup_queue.put((sar_source, wind_source))
+    try:
+        logger.debug("Starting dataset making process")
+        while True:
+            next_item = preprocessed_queue.get()
+            if next_item is Done:
+                logger.debug("Stopping dataset making process")
+                break
+            sar_source, wind_source = next_item
+            try:
+                full_dataset_path = make_full_dataset(
+                    sar_source=sar_source, wind_source=wind_source,
+                    out_dir=output_dir,
+                    full_ds_file_name=make_product_file_name(sar_source, product_version, file_version),
+                    gmf=gmf, iterations=iterations)
+                if plot:
+                    processed_queue.put((sar_source, wind_source, full_dataset_path))
+                elif cleanup:
+                    cleanup_queue.put((sar_source, wind_source))
+            except Exception:
+                logger.error("Error during dataset creation for %s",
+                            sar_source.identifier, exc_info=True)
+                if cleanup:
+                    cleanup_queue.put((sar_source, wind_source))
+    except:
+        logger.error("Error in make_dataset process", exc_info=True)
 
 
 def multiprocess_plot_dataset(
@@ -456,47 +462,47 @@ def multiprocess_plot_dataset(
         plot_dir: Path):
     """Plot the full dataset. Meant to be run in a separate process
     """
-    logger.debug("Starting plotting process")
-    while True:
-        next_item = processed_queue.get()
-        if next_item is Done:
-            logger.debug("Stopping plotting process")
-            break
-        sar_source, wind_source, full_dataset_path = next_item
-        try:
-            plot_full_dataset(sar_source, wind_source, full_dataset_path, plot_dir)
-        except Exception:
-            logger.error("Error during plotting of %s", sar_source.identifier, exc_info=True)
+    try:
+        logger.debug("Starting plotting process")
+        while True:
+            next_item = processed_queue.get()
+            if next_item is Done:
+                logger.debug("Stopping plotting process")
+                break
+            sar_source, wind_source, full_dataset_path = next_item
+            try:
+                plot_full_dataset(sar_source, wind_source, full_dataset_path, plot_dir)
+            except Exception:
+                logger.error("Error during plotting of %s", sar_source.identifier, exc_info=True)
+    except:
+        logger.error("Error in plotting process", exc_info=True)
 
 
 def multiprocess_cleanup(cleanup_queue: multiprocessing.Queue):
     """Cleanup input and intermediary files after processing"""
-    logger.debug("Starting cleanup process")
-    while True:
-        next_item = cleanup_queue.get()
-        if next_item is Done:
-            logger.debug("Stopping plotting process")
-            break
-        sar_source, wind_source = next_item
-        logger.info("Deleting temporary files for %s", sar_source.identifier)
-        to_delete: tuple[Path] = (
-            sar_source.data_path,
-            sar_source.data_path.parent / f"{sar_source.data_path.stem}.zip",
-            sar_source.preprocessed_path,
-            wind_source.data_path,
-            wind_source.interpolated_path,
-        )
-        for p in to_delete:
-            if p:
-                logger.debug("Deleting %s", p)
-                try:
-                    p.unlink()
-                except IsADirectoryError:
-                    shutil.rmtree(p)
-                except FileNotFoundError as e:
-                    logger.debug("File does not exist, can't remove: %s", e.filename)
-                except Exception:
-                    logger.error("Error while deleting %s", p, exc_info=True)
+    try:
+        logger.debug("Starting cleanup process")
+        while True:
+            next_item = cleanup_queue.get()
+            if next_item is Done:
+                logger.debug("Stopping cleanup process")
+                break
+            sar_source, wind_source = next_item
+            logger.info("Deleting temporary files for %s", sar_source.identifier)
+            to_delete = (*sar_source.to_cleanup, *wind_source.to_cleanup)
+            for p in to_delete:
+                if p:
+                    logger.debug("Deleting %s", p)
+                    try:
+                        p.unlink()
+                    except IsADirectoryError:
+                        shutil.rmtree(p)
+                    except FileNotFoundError as e:
+                        logger.debug("File does not exist, can't remove: %s", e.filename)
+                    except Exception:
+                        logger.error("Error while deleting %s", p, exc_info=True)
+    except:
+        logger.error("Error in cleanup process", exc_info=True)
 
 
 def stop_processes(processes: dict, timeout: int = 1800):
