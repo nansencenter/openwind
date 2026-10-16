@@ -157,7 +157,8 @@ def u_v_from_dir_speed(dir, magnitude):
 
 
 def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
-                      full_ds_path: Path, out_dir: Path):
+                      full_ds_path: Path, out_dir: Path,
+                      extent: utils.Extent = None):
     """Makes a basic plot of the full dataset"""
     out_file = Path(out_dir, f'{full_ds_path.stem}.png')
     logger.info("Plotting full dataset. Writing to %s", out_file)
@@ -196,7 +197,7 @@ def plot_full_dataset(sar_source: sar_data.SARSource, wind_source,
 
             for row in axs:
                 for ax in row:
-                    ax.set_extent(sar_source.bounding_box)
+                    ax.set_extent(extent or sar_source.bounding_box)
                     ax.coastlines()
                     ax.set_anchor('W')
                     ax.set_xlabel('')
