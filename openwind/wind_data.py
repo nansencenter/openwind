@@ -14,15 +14,17 @@
 import logging
 import re
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Union, Optional, Tuple
 
 import asf_search as asf
 import cdsapi
 import numpy as np
+import requests
 import shapely.geometry
 import xarray as xr
+from filelock import FileLock
 from nansat import Nansat
 from numpy.typing import NDArray
 from osgeo import gdal
@@ -439,10 +441,77 @@ class Sentinel1OCNSource(WindSource):
 class MEPSSource(WindSource):
     """Class used to manage a MEPS wind source"""
     model_name = 'MEPS'
+    variables_to_extract = set((
+        'projection_lambert',
+        'x_wind_10m',
+        'y_wind_10m',
+    ))
+    archive_old_style = datetime(2020,2,4, tzinfo=timezone.utc)
+    archive_no_cleanup = datetime(2023, 9, 30, tzinfo=timezone.utc)
 
     def __init__(self, sar_source: Sentinel1Source = None, data_path: Path = None):
         super().__init__(sar_source, data_path)
         self._time = None
+
+    @property
+    def identifier(self):
+        if not self.product:
+            self.find_product()
+        return Path(self.product).stem
+
+    def check_product_url(self, url):
+        r = requests.get(f"{url}.html")
+        if r.status_code >= 200 and r.status_code < 300:
+            vars_present = True
+            for v in self.variables_to_extract:
+                if v not in r.text:
+                    vars_present = False
+                    break
+            return vars_present
+        else:
+            return False
+
+    def find_product(self, bbox_expansion = 0.1):
+        sar_mid_time = (
+            self.sar_source.end_time
+            - (self.sar_source.end_time - self.sar_source.start_time) / 2)
+
+        period = 6
+        model_time = sar_mid_time.replace(hour=(sar_mid_time.hour // period) * period)
+        if sar_mid_time <= self.archive_no_cleanup:
+            if sar_mid_time <= self.archive_old_style:
+                name_template = 'meps_subset_2_5km_{year:04d}{month:02d}{day:02d}T{hour:02d}Z.nc'
+            else:
+                name_template = 'meps_det_2_5km_{year:04d}{month:02d}{day:02d}T{hour:02d}Z.nc'
+        else:
+            name_template = 'meps_det_sfc_{year:04d}{month:02d}{day:02d}T{hour:02d}Z.ncml'
+
+        base_url_template = (
+            "https://thredds.met.no/thredds/dodsC/meps25epsarchive/"
+            "{year:04d}/{month:02d}/{day:02d}/")
+        product_url_template = base_url_template + name_template
+
+        max_tries = 5
+        tries = 0
+        found_url = False
+        product_url = None
+        while tries < max_tries and not found_url:
+            product_url = product_url_template.format(
+                year=sar_mid_time.year,
+                month=sar_mid_time.month,
+                day=sar_mid_time.day,
+                hour=model_time.hour)
+            if self.check_product_url(product_url):
+                found_url = True
+            else:
+                model_time += timedelta(hours=period)
+                tries += 1
+
+        if not found_url and tries == max_tries:
+            raise RuntimeError(f"Could not find MEPS dataset matching {self.sar_source.identifier}")
+        else:
+            self.product = product_url
+        return self.product
 
     def _get_wind_time_index(self):
         """Get the time of the wind model matching the SAR data
@@ -463,6 +532,33 @@ class MEPSSource(WindSource):
             self._get_wind_time_index()
         return self._time
 
+    def download(self, out_dir: Union[str, Path], bbox_expansion=.2, out_name=None):
+        if self.product is None:
+            self.find_product()
+
+        name = Path(self.product).stem
+        if out_name is None:
+            out_path = out_dir / f"{name}.nc"
+        else:
+            out_path = out_dir / out_name
+        lock_path = Path(f"{out_path}.lock")
+        with FileLock(lock_path):
+            if out_path.exists():
+                print(f"Already downloaded {self.product}")
+            else:
+                print(f"Downloading {self.product}")
+                extent = self.sar_source.bounding_box
+                with xr.open_dataset(self.product) as full_d:
+                    if 'ensemble_member' in full_d:
+                        full_d = full_d.isel(ensemble_member=0)
+                    d = full_d[self.variables_to_extract].where(
+                        (full_d.longitude > extent.west - bbox_expansion) &
+                        (full_d.longitude < extent.east + bbox_expansion) &
+                        (full_d.latitude > extent.south - bbox_expansion) &
+                        (full_d.latitude < extent.north + bbox_expansion),
+                        drop=True)
+                    d.to_netcdf(out_path)
+        self.data_path = out_path
     @staticmethod
     def lcc_grid_convergence_angle(longitude, central_meridian=-25., central_latitude=77.5):
         """Calculate grid convergence angle for the Lambert Conic Conformal (LCC)
