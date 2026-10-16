@@ -343,7 +343,7 @@ class Sentinel1Source(SARSource):
         """Get the properties from the ASF product"""
         return self._asf_product.properties
 
-    def download(self, out_dir, unzip=False):
+    def download(self, out_dir, unzip=False, max_retries=5):
         """Download the dataset"""
         if self.data_path is None:
             target = Path(out_dir, self.properties['fileName'])
@@ -359,7 +359,19 @@ class Sentinel1Source(SARSource):
                 logger.info("Did not download, destination already exists: %s", existing_file)
             else:
                 logger.info("Downloading to %s", target)
-                self._asf_product.download(str(out_dir))
+                tries = 0
+                success = False
+                error_cause = None
+                while not success and tries < max_retries:
+                    try:
+                        self._asf_product.download(str(out_dir))
+                        success = True
+                    except requests.RequestException as err:
+                        error_cause = err
+                    finally:
+                        tries += 1
+                if not success:
+                    raise RuntimeError(f"Failed to download {target}") from error_cause
 
             self.data_path = target
         if unzip:
