@@ -155,6 +155,7 @@ class WindSource():
         self.product = None
         self.data_path = data_path
         self.interpolated_path = None
+        self.to_cleanup = set()
 
     def get_time(self):
         raise NotImplementedError()
@@ -230,6 +231,7 @@ class ERA5Source(WindSource):
             logger.info("Downloading to %s", era5_file)
             self.product.download(era5_file)
         self.data_path = era5_file
+        self.to_cleanup.add(era5_file)
         return era5_file
 
     def interpolate_on_sar_grid(self, out_dir: Path):
@@ -277,6 +279,7 @@ class ERA5Source(WindSource):
                 )
                 interp_era5.to_netcdf(out_file)
         self.interpolated_path = out_file
+        self.to_cleanup.add(out_file)
         return out_file
 
 
@@ -343,6 +346,7 @@ class Sentinel1OCNSource(WindSource):
         else:
             logger.info("Did not download, destination already exists: %s", target)
         self.data_path = target
+        self.to_cleanup.add(target)
         self.unzip(out_dir)
         return target
 
@@ -360,6 +364,7 @@ class Sentinel1OCNSource(WindSource):
         else:
             logger.info("Already unzipped: %s", self.data_path)
         self.data_path = list((safe_path / 'measurement').glob('s1*.nc'))[0]
+        self.to_cleanup.add(safe_path)
         return self.data_path
 
     def geolocate_variable(self, file_path, variable_name):
@@ -388,6 +393,7 @@ class Sentinel1OCNSource(WindSource):
                 str(warped_dir),
                 str(translated_dir),
                 dstSRS='epsg:4326')
+            self.to_cleanup.add(warped_dir)
         return warped_dir
 
     def interpolate_on_sar_grid(self, out_dir: Path):
@@ -559,6 +565,9 @@ class MEPSSource(WindSource):
                         drop=True)
                     d.to_netcdf(out_path)
         self.data_path = out_path
+        self.to_cleanup.add(out_path)
+        self.to_cleanup.add(lock_path)
+
     @staticmethod
     def lcc_grid_convergence_angle(longitude, central_meridian=-25., central_latitude=77.5):
         """Calculate grid convergence angle for the Lambert Conic Conformal (LCC)
@@ -700,6 +709,7 @@ class MEPSSource(WindSource):
                     },
                     attrs=d.attrs,
                 ).to_netcdf(out_file)
+        self.to_cleanup.add(out_file)
         return out_file
 
     def geolocate(self, file_path) -> list[Path]:
@@ -735,6 +745,7 @@ class MEPSSource(WindSource):
                     str(translated_dir),
                     dstSRS='epsg:4326')
             results.append(warped_file)
+            self.to_cleanup.add(warped_file)
         return results
 
     def interpolate_on_sar_grid(self, out_dir: Path):
@@ -777,4 +788,5 @@ class MEPSSource(WindSource):
                     }
                 ).to_netcdf(out_file)
         self.interpolated_path = out_file
+        self.to_cleanup.add(out_file)
         return out_file

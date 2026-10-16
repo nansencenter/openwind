@@ -10,6 +10,7 @@ import asf_search as asf
 import dateutil.parser
 import numpy as np
 import pythesint as pti
+import requests
 import shapely.geometry
 import xarray as xr
 from nansat import Nansat
@@ -243,6 +244,7 @@ class Sentinel1Source(SARSource):
         self._asf_product = asf_product
         self.data_path = Path(data_path) if data_path is not None else None
         self.preprocessed_path = None
+        self.to_cleanup = set()
 
         self._bounding_box = None
         self._start_time = None
@@ -374,6 +376,7 @@ class Sentinel1Source(SARSource):
                     raise RuntimeError(f"Failed to download {target}") from error_cause
 
             self.data_path = target
+            self.to_cleanup.add(target)
         if unzip:
             self.unzip(out_dir)
         return self.data_path
@@ -396,9 +399,11 @@ class Sentinel1Source(SARSource):
                     raise RuntimeError(f"Not a Sentinel-1 SAFE archive: {self.data_path}")
             if remove_zip:
                 self.data_path.unlink()
+                self.to_cleanup.discard(self.data_path)
         else:
             logger.info("Already unzipped: %s", self.data_path)
         self.data_path = safe_path
+        self.to_cleanup.add(safe_path)
         return self.data_path
 
     def _run_s1_correction(self,
@@ -471,6 +476,7 @@ class Sentinel1Source(SARSource):
             s1_dataset.to_netcdf(output_path)
 
         self.preprocessed_path = output_path
+        self.to_cleanup.add(output_path)
         return output_path
 
     def get_product_metadata(self):
@@ -496,6 +502,7 @@ class EnvisatASARSource(SARSource):
         self.data_path = data_path
 
         self.preprocessed_path = None
+        self.to_cleanup = set()
         self._bounding_box = None
         self._start_time = None
         self._end_time = None
@@ -585,6 +592,7 @@ class EnvisatASARSource(SARSource):
             s1_dataset.to_netcdf(output_path)
 
         self.preprocessed_path = output_path
+        self.to_cleanup.add(output_path)
         return output_path
 
     def get_product_metadata(self):
