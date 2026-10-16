@@ -373,7 +373,8 @@ def thread_download(
             return None
 
     try:
-        wind_source.download(wind_folder)
+        wind_source.download(wind_folder,
+                             out_name=f"{wind_source.identifier}_{sar_source.identifier}.nc")
     except RuntimeError:
         logger.warning("No wind data found matching %s", sar_source.identifier)
         if cleanup:
